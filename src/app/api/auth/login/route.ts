@@ -1,7 +1,10 @@
 // versi 2
 
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma"; // Gunakan folder sesuai log generate kamu
+// import { PrismaClient } from "@/generated/prisma";
+import { PrismaClient } from '@prisma/client'
+
+
 
 const prisma = new PrismaClient();
 

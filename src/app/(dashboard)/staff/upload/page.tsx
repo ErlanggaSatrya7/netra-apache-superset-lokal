@@ -44,6 +44,56 @@ export default function UploadPage() {
     }
   };
 
+  // const handleSendToDirector = async () => {
+  //   if (!file) {
+  //     toast.error("Silakan pilih file terlebih dahulu!");
+  //     return;
+  //   }
+
+  //   setIsUploading(true);
+  //   const loadingToast = toast.loading(
+  //     "Menganalisis & Membersihkan Data Adidas..."
+  //   );
+
+  //   try {
+  //     // 1. Baca ulang seluruh data (bukan cuma preview 5 baris)
+  //     const reader = new FileReader();
+  //     reader.onload = async (evt) => {
+  //       const bstr = evt.target?.result;
+  //       const wb = XLSX.read(bstr, { type: "binary" });
+  //       const wsname = wb.SheetNames[0];
+  //       const ws = wb.Sheets[wsname];
+  //       const fullData = XLSX.utils.sheet_to_json(ws);
+
+  //       // 2. Kirim ke API Backend
+  //       const res = await fetch("/api/upload", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ data: fullData }),
+  //       });
+
+  //       const result = await res.json();
+
+  //       if (res.ok) {
+  //         toast.success("Misi Berhasil! Data sudah bersih di database.", {
+  //           id: loadingToast,
+  //         });
+  //         setFile(null);
+  //         setDataPreview([]);
+  //         // Balik ke dashboard staff
+  //         router.push("/staff");
+  //       } else {
+  //         toast.error(result.message || "Gagal upload", { id: loadingToast });
+  //       }
+  //     };
+  //     reader.readAsBinaryString(file);
+  //   } catch (err) {
+  //     toast.error("Koneksi ke server terputus", { id: loadingToast });
+  //   } finally {
+  //     setIsUploading(false);
+  //   }
+  // };
+
   const handleSendToDirector = async () => {
     if (!file) {
       toast.error("Silakan pilih file terlebih dahulu!");
@@ -51,43 +101,34 @@ export default function UploadPage() {
     }
 
     setIsUploading(true);
-    const loadingToast = toast.loading(
-      "Menganalisis & Membersihkan Data Adidas..."
-    );
+    const loadingToast = toast.loading("Mengirim file Excel ke server...");
 
     try {
-      // 1. Baca ulang seluruh data (bukan cuma preview 5 baris)
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const fullData = XLSX.utils.sheet_to_json(ws);
+      // Gunakan FormData untuk mengirim file fisik
+      const formData = new FormData();
+      formData.append("file", file); // Key 'file' harus sama dengan yang ada di backend
 
-        // 2. Kirim ke API Backend
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: fullData }),
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        // Jangan set headers Content-Type secara manual saat menggunakan FormData
+        // Browser akan otomatis menyetelnya beserta boundary-nya
+        body: formData, 
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        toast.success("Misi Berhasil! File sedang diproses di database.", {
+          id: loadingToast,
         });
-
-        const result = await res.json();
-
-        if (res.ok) {
-          toast.success("Misi Berhasil! Data sudah bersih di database.", {
-            id: loadingToast,
-          });
-          setFile(null);
-          setDataPreview([]);
-          // Balik ke dashboard staff
-          router.push("/staff");
-        } else {
-          toast.error(result.message || "Gagal upload", { id: loadingToast });
-        }
-      };
-      reader.readAsBinaryString(file);
+        setFile(null);
+        setDataPreview([]);
+        router.push("/staff");
+      } else {
+        toast.error(result.error || "Gagal upload", { id: loadingToast });
+      }
     } catch (err) {
+      console.error(err);
       toast.error("Koneksi ke server terputus", { id: loadingToast });
     } finally {
       setIsUploading(false);
