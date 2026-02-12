@@ -1,14 +1,66 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  // output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model city {
+  id_city     Int           @id @default(autoincrement())
+  city        String        @db.VarChar
+  id_state    Int
+  state       state         @relation(fields: [id_state], references: [id_state], onDelete: Cascade, onUpdate: NoAction, map: "fk_city_state")
+  transaction transaction[]
+}
+
+model method {
+  id_method   Int           @id @default(autoincrement())
+  method      String        @db.VarChar
+  transaction transaction[]
+}
+
+model product {
+  id_product  Int           @id @default(autoincrement())
+  product     String        @db.VarChar
+  transaction transaction[]
+}
+
+model retailer {
+  id_retailer   Int           @id @default(autoincrement())
+  retailer_name String        @db.VarChar
+  transaction   transaction[]
+}
+
+model state {
+  id_state Int    @id @default(autoincrement())
+  state    String @db.VarChar
+  city     city[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model transaction {
+  id_transaction   Int       @id @default(autoincrement())
+  id_retailer      Int
+  id_product       Int
+  id_method        Int
+  id_city          Int
+  invoice_date     DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
+  price_per_unit   Decimal?  @db.Decimal
+  unit_sold        Int?
+  total_sales      Decimal?  @db.Decimal
+  operating_profit Decimal?  @db.Decimal
+  operating_margin Decimal?  @db.Decimal
+  city             city      @relation(fields: [id_city], references: [id_city], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_city")
+  method           method    @relation(fields: [id_method], references: [id_method], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_method")
+  product          product   @relation(fields: [id_product], references: [id_product], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_product")
+  retailer         retailer  @relation(fields: [id_retailer], references: [id_retailer], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_retailer")
+}
+
+model users {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email    String? @unique
+  password String?
 }
