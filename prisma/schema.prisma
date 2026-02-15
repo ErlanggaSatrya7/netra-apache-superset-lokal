@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -10,7 +9,7 @@ datasource db {
 
 model city {
   id_city     Int           @id @default(autoincrement())
-  city        String        @db.VarChar
+  city        String        @unique(map: "city_unique_name") @db.VarChar
   id_state    Int
   state       state         @relation(fields: [id_state], references: [id_state], onDelete: Cascade, onUpdate: NoAction, map: "fk_city_state")
   transaction transaction[]
@@ -18,25 +17,25 @@ model city {
 
 model method {
   id_method   Int           @id @default(autoincrement())
-  method      String        @db.VarChar
+  method      String        @unique(map: "method_unique_name") @db.VarChar
   transaction transaction[]
 }
 
 model product {
   id_product  Int           @id @default(autoincrement())
-  product     String        @db.VarChar
+  product     String        @unique(map: "product_unique_name") @db.VarChar
   transaction transaction[]
 }
 
 model retailer {
   id_retailer   Int           @id @default(autoincrement())
-  retailer_name String        @db.VarChar
+  retailer_name String        @unique(map: "retailer_unique_name") @db.VarChar
   transaction   transaction[]
 }
 
 model state {
   id_state Int    @id @default(autoincrement())
-  state    String @db.VarChar
+  state    String @unique @db.VarChar // TAMBAHKAN @unique DI SINI
   city     city[]
 }
 
@@ -53,6 +52,7 @@ model transaction {
   total_sales      Decimal?  @db.Decimal
   operating_profit Decimal?  @db.Decimal
   operating_margin Decimal?  @db.Decimal
+  is_approved      Boolean?  @default(false)
   city             city      @relation(fields: [id_city], references: [id_city], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_city")
   method           method    @relation(fields: [id_method], references: [id_method], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_method")
   product          product   @relation(fields: [id_product], references: [id_product], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_product")
@@ -63,4 +63,13 @@ model users {
   id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email    String? @unique
   password String?
+}
+
+model upload_history {
+  id_upload   Int       @id @default(autoincrement())
+  file_name   String    @db.VarChar
+  system_name String    @db.VarChar
+  total_rows  Int
+  upload_date DateTime? @default(now()) @db.Timestamp(6)
+  status      String?   @default("MENUNGGU ADMIN (PENDING)") @db.VarChar
 }

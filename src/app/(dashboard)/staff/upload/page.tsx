@@ -1,481 +1,200 @@
-// VERSI 2
-
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Upload, FileSpreadsheet, X, Send, Eye } from "lucide-react";
-import { toast } from "sonner";
+  Upload,
+  Loader2,
+  FileSpreadsheet,
+  AlertCircle,
+  CheckCircle2,
+  Table as TableIcon,
+  X,
+  Send,
+} from "lucide-react";
 import * as XLSX from "xlsx";
+import { useToast } from "@/hooks/use-toast";
 
 export default function UploadPage() {
+  const [uploading, setUploading] = useState(false);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const router = useRouter();
-  const [file, setFile] = useState<File | null>(null);
-  const [dataPreview, setDataPreview] = useState<any[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
+  const handleFileSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: "binary" });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0];
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
 
-        // Simpan 5 baris pertama untuk preview tabel UI
-        setDataPreview(data.slice(0, 5));
-      };
-      reader.readAsBinaryString(selectedFile);
-    }
+      // Ambil 5 baris pertama saja untuk preview agar tidak berat
+      setPreviewData(data.slice(0, 5));
+    };
+    reader.readAsBinaryString(file);
   };
 
-  const handleSendToDirector = async () => {
-    if (!file) {
-      toast.error("Silakan pilih file terlebih dahulu!");
-      return;
-    }
+  const processUpload = async () => {
+    if (!selectedFile) return;
 
-    setIsUploading(true);
-    const loadingToast = toast.loading(
-      "Menganalisis & Membersihkan Data Adidas..."
-    );
+    setUploading(true);
+    const reader = new FileReader();
 
-    try {
-      // 1. Baca ulang seluruh data (bukan cuma preview 5 baris)
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
+    reader.onload = async (evt) => {
+      try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: "binary" });
         const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const fullData = XLSX.utils.sheet_to_json(ws);
+        const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname]);
 
-        // 2. Kirim ke API Backend
         const res = await fetch("/api/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: fullData }),
+          body: JSON.stringify({
+            data,
+            fileName: selectedFile.name,
+          }),
         });
 
         const result = await res.json();
 
         if (res.ok) {
-          toast.success("Misi Berhasil! Data sudah bersih di database.", {
-            id: loadingToast,
+          toast({
+            title: "VORTEX SYNC SUCCESS",
+            description: result.message || "Data mendarat di database.",
           });
-          setFile(null);
-          setDataPreview([]);
-          // Balik ke dashboard staff
           router.push("/staff");
+          router.refresh();
         } else {
-          toast.error(result.message || "Gagal upload", { id: loadingToast });
+          throw new Error(result.message);
         }
-      };
-      reader.readAsBinaryString(file);
-    } catch (err) {
-      toast.error("Koneksi ke server terputus", { id: loadingToast });
-    } finally {
-      setIsUploading(false);
-    }
+      } catch (err: any) {
+        alert("Gagal mengunggah data: " + err.message);
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsBinaryString(selectedFile);
   };
 
   return (
-    <div className="space-y-8 pb-20">
-      <div>
-        <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">
-          Upload Adidas Data
+    <div className="max-w-6xl mx-auto py-10 px-4 space-y-8 animate-in fade-in duration-700">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white flex items-center gap-3">
+          <Upload className="text-blue-500 h-10 w-10" /> Data Ingestion
         </h1>
-        <p className="text-slate-400 font-medium">
-          Sistem Analisis Penjualan Region - PT Netra Vidya Analitika
+        <p className="text-slate-500 font-medium italic">
+          Hubungkan dataset eksternal ke dalam inti sistem Netra Vidya
+          Analitika.
         </p>
       </div>
 
-      {/* Area Dropzone */}
-      <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-md">
-        <CardContent className="pt-8 pb-8">
-          <div className="border-2 border-dashed border-slate-800 rounded-3xl p-10 flex flex-col items-center justify-center transition-all hover:border-blue-500/50 hover:bg-blue-500/5 group">
-            {!file ? (
-              <>
-                <div className="h-20 w-20 rounded-2xl bg-slate-950 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(37,99,235,0.1)]">
-                  <Upload className="h-10 w-10 text-blue-500" />
-                </div>
-                <h3 className="text-xl font-bold text-white tracking-tight">
-                  Tarik file Excel kamu ke sini
-                </h3>
-                <p className="text-sm text-slate-500 mt-2 italic">
-                  Format: .xlsx atau .csv
-                </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Kolom Kiri: Dropzone */}
+        <Card className="lg:col-span-1 bg-slate-900/60 border-slate-800 border-2 backdrop-blur-xl h-fit">
+          <CardContent className="pt-10 flex flex-col items-center">
+            <div className="h-20 w-20 bg-blue-600/10 rounded-3xl flex items-center justify-center mb-6 border border-blue-500/20">
+              <FileSpreadsheet className="h-10 w-10 text-blue-500" />
+            </div>
+
+            <label
+              className={`w-full cursor-pointer ${
+                uploading ? "opacity-50 pointer-events-none" : ""
+              }`}
+            >
+              <div className="bg-slate-950 border-2 border-dashed border-slate-800 hover:border-blue-500/50 p-8 rounded-2xl flex flex-col items-center gap-4 transition-all">
+                <span className="text-slate-400 font-bold text-center text-sm uppercase tracking-widest">
+                  {selectedFile
+                    ? selectedFile.name
+                    : "Klik untuk pilih file Adidas"}
+                </span>
                 <input
                   type="file"
                   className="hidden"
-                  id="file-upload"
-                  accept=".xlsx, .csv"
-                  onChange={handleFileChange}
+                  accept=".xlsx, .xls"
+                  onChange={handleFileSelection}
                 />
-                <Button
-                  className="mt-8 bg-blue-600 hover:bg-blue-500 font-bold px-10 py-6 rounded-xl"
-                  onClick={() =>
-                    document.getElementById("file-upload")?.click()
-                  }
-                >
-                  CARI FILE
-                </Button>
-              </>
-            ) : (
-              <div className="w-full flex items-center justify-between bg-slate-950/80 p-6 rounded-2xl border border-blue-500/30">
-                <div className="flex items-center gap-5">
-                  <div className="h-14 w-14 bg-blue-600/20 rounded-xl flex items-center justify-center">
-                    <FileSpreadsheet className="h-8 w-8 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold text-white tracking-tight leading-none mb-1">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-slate-500 uppercase font-bold">
-                      {(file.size / 1024).toFixed(2)} KB • DATA SIAP DIPROSES
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setFile(null);
-                    setDataPreview([]);
-                  }}
-                  className="p-2 hover:bg-red-500/20 rounded-full text-slate-500 hover:text-red-400 transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </label>
 
-      {/* Preview Table Section */}
-      {dataPreview.length > 0 && (
-        <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-blue-400" />
-              <h2 className="text-lg font-bold text-white uppercase tracking-wider">
-                Preview 5 Data Teratas
-              </h2>
-            </div>
-          </div>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-950">
-                  <TableRow className="border-slate-800">
-                    {Object.keys(dataPreview[0]).map((key) => (
-                      <TableHead
-                        key={key}
-                        className="text-slate-400 font-bold uppercase text-[10px] tracking-widest py-5"
-                      >
-                        {key}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dataPreview.map((row, i) => (
-                    <TableRow
-                      key={i}
-                      className="border-slate-800 hover:bg-slate-800/30 transition-colors"
-                    >
-                      {Object.values(row).map((val: any, j) => (
-                        <TableCell
-                          key={j}
-                          className="text-slate-300 text-sm py-4 font-medium"
-                        >
-                          {val}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="p-6 bg-slate-950/50 flex justify-end">
+            {selectedFile && (
               <Button
-                disabled={isUploading}
-                onClick={handleSendToDirector}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-black px-10 py-7 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.3)] border-none"
+                onClick={processUpload}
+                disabled={uploading}
+                className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-black h-14 rounded-xl uppercase italic tracking-widest"
               >
-                {isUploading ? "MENGIRIM..." : "KIRIM KE DIREKTUR"}{" "}
-                <Send className="ml-3 h-5 w-5" />
+                {uploading ? (
+                  <Loader2 className="animate-spin mr-2" />
+                ) : (
+                  <Send className="mr-2" />
+                )}
+                Luncurkan Data
               </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
-      )}
+
+        {/* Kolom Kanan: Preview Data */}
+        <Card className="lg:col-span-2 bg-slate-950/80 border-slate-800 border-2 overflow-hidden">
+          <CardHeader className="border-b border-slate-800 bg-slate-900/40">
+            <CardTitle className="text-sm font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-2">
+              <TableIcon size={16} /> Data Preview (5 Baris Pertama)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {previewData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-900">
+                      {Object.keys(previewData[0]).map((key) => (
+                        <th
+                          key={key}
+                          className="p-4 text-[10px] font-black uppercase text-slate-500 border-b border-slate-800 tracking-wider"
+                        >
+                          {key}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.map((row, i) => (
+                      <tr
+                        key={i}
+                        className="border-b border-slate-900 hover:bg-blue-500/5 transition-colors"
+                      >
+                        {Object.values(row).map((val: any, j) => (
+                          <td
+                            key={j}
+                            className="p-4 text-xs font-mono text-slate-300"
+                          >
+                            {val}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-32 flex flex-col items-center justify-center text-slate-700">
+                <TableIcon size={48} className="mb-4 opacity-20" />
+                <p className="font-black italic uppercase tracking-widest text-xs opacity-40">
+                  Belum ada data untuk ditampilkan
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
-
-// CARA 1
-
-// "use client";
-
-// import { useState } from "react";
-// import { Card, CardContent } from "@/components/ui/card";
-// import { Button } from "@/components/ui/button";
-// import {
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableHead,
-//   TableHeader,
-//   TableRow,
-// } from "@/components/ui/table";
-// import { Upload, FileSpreadsheet, X, Send, Eye } from "lucide-react";
-// import { toast } from "sonner";
-// import * as XLSX from "xlsx"; //
-
-// export default function UploadPage() {
-//   const [file, setFile] = useState<File | null>(null);
-//   const [dataPreview, setDataPreview] = useState<any[]>([]);
-
-//   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-//     const selectedFile = e.target.files?.[0];
-//     if (selectedFile) {
-//       setFile(selectedFile);
-
-//       // Logika membaca file Excel
-//       const reader = new FileReader();
-//       reader.onload = (evt) => {
-//         const bstr = evt.target?.result;
-//         const wb = XLSX.read(bstr, { type: "binary" });
-//         const wsname = wb.SheetNames[0];
-//         const ws = wb.Sheets[wsname];
-//         const data = XLSX.utils.sheet_to_json(ws);
-//         setDataPreview(data.slice(0, 5)); // Ambil 5 baris pertama saja untuk preview
-//       };
-//       reader.readAsBinaryString(selectedFile);
-//     }
-//   };
-
-//   // Cari fungsi handleSendToDirector di file upload kamu, lalu ganti isinya:
-
-//   // Cari fungsi handleSendToDirector di file upload kamu, lalu ganti isinya:
-
-//   const handleSendToDirector = async () => {
-//     if (dataPreview.length === 0) return;
-
-//     const loadingToast = toast.loading(
-//       "Menganalisis & Membersihkan Data Adidas..."
-//     );
-
-//     try {
-//       // Kita kirim seluruh data hasil parsing XLSX
-//       const res = await fetch("/api/upload", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ data: dataPreview }),
-//       });
-
-//       const result = await res.json();
-
-//       if (res.ok) {
-//         toast.success("Misi Berhasil! Data sudah bersih di database.", {
-//           id: loadingToast,
-//         });
-//         setFile(null);
-//         setDataPreview([]);
-//         // Balik ke dashboard setelah sukses
-//         router.push("/staff");
-//       } else {
-//         toast.error(result.message || "Gagal upload", { id: loadingToast });
-//       }
-//     } catch (err) {
-//       toast.error("Koneksi ke Laragon terputus", { id: loadingToast });
-//     }
-//   };
-
-//   const handleSendToDirector = async () => {
-//     if (dataPreview.length === 0) return;
-
-//     const loadingToast = toast.loading(
-//       "Menganalisis & Membersihkan Data Adidas..."
-//     );
-
-//     try {
-//       // Kita kirim seluruh data hasil parsing XLSX
-//       const res = await fetch("/api/upload", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ data: dataPreview }),
-//       });
-
-//       const result = await res.json();
-
-//       if (res.ok) {
-//         toast.success("Misi Berhasil! Data sudah bersih di database.", {
-//           id: loadingToast,
-//         });
-//         setFile(null);
-//         setDataPreview([]);
-//         // Balik ke dashboard setelah sukses
-//         router.push("/staff");
-//       } else {
-//         toast.error(result.message || "Gagal upload", { id: loadingToast });
-//       }
-//     } catch (err) {
-//       toast.error("Koneksi ke Laragon terputus", { id: loadingToast });
-//     }
-//   };
-
-//   const handleSendToDirector = () => {
-//     toast.success(
-//       "Data Adidas Indonesia telah dikirim ke Direktur untuk di-approve!"
-//     );
-//     setFile(null);
-//     setDataPreview([]);
-//   };
-
-//   return (
-//     <div className="space-y-8 pb-20">
-//       <div>
-//         <h1 className="text-3xl font-black text-white tracking-tighter uppercase italic">
-//           Upload Adidas Data
-//         </h1>
-//         <p className="text-slate-400 font-medium">
-//           Sistem Analisis Penjualan Region - PT Netra Vidya Analitika
-//         </p>
-//       </div>
-
-//       {/* Area Dropzone */}
-//       <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-md">
-//         <CardContent className="pt-8 pb-8">
-//           <div className="border-2 border-dashed border-slate-800 rounded-3xl p-10 flex flex-col items-center justify-center transition-all hover:border-blue-500/50 hover:bg-blue-500/5 group">
-//             {!file ? (
-//               <>
-//                 <div className="h-20 w-20 rounded-2xl bg-slate-950 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-[0_0_20px_rgba(37,99,235,0.1)]">
-//                   <Upload className="h-10 w-10 text-blue-500" />
-//                 </div>
-//                 <h3 className="text-xl font-bold text-white tracking-tight">
-//                   Tarik file Excel kamu ke sini
-//                 </h3>
-//                 <p className="text-sm text-slate-500 mt-2 italic">
-//                   Format: .xlsx atau .csv
-//                 </p>
-//                 <input
-//                   type="file"
-//                   className="hidden"
-//                   id="file-upload"
-//                   accept=".xlsx, .csv"
-//                   onChange={handleFileChange}
-//                 />
-//                 <Button
-//                   className="mt-8 bg-blue-600 hover:bg-blue-500 font-bold px-10 py-6 rounded-xl"
-//                   onClick={() =>
-//                     document.getElementById("file-upload")?.click()
-//                   }
-//                 >
-//                   CARI FILE
-//                 </Button>
-//               </>
-//             ) : (
-//               <div className="w-full flex items-center justify-between bg-slate-950/80 p-6 rounded-2xl border border-blue-500/30">
-//                 <div className="flex items-center gap-5">
-//                   <div className="h-14 w-14 bg-blue-600/20 rounded-xl flex items-center justify-center">
-//                     <FileSpreadsheet className="h-8 w-8 text-blue-500" />
-//                   </div>
-//                   <div>
-//                     <p className="text-lg font-bold text-white tracking-tight leading-none mb-1">
-//                       {file.name}
-//                     </p>
-//                     <p className="text-xs text-slate-500 uppercase font-bold">
-//                       {(file.size / 1024).toFixed(2)} KB • DATA SIAP DIPROSES
-//                     </p>
-//                   </div>
-//                 </div>
-//                 <button
-//                   onClick={() => {
-//                     setFile(null);
-//                     setDataPreview([]);
-//                   }}
-//                   className="p-2 hover:bg-red-500/20 rounded-full text-slate-500 hover:text-red-400 transition-colors"
-//                 >
-//                   <X className="h-6 w-6" />
-//                 </button>
-//               </div>
-//             )}
-//           </div>
-//         </CardContent>
-//       </Card>
-
-//       {/* Preview Table Section */}
-//       {dataPreview.length > 0 && (
-//         <Card className="bg-slate-900/40 border-slate-800 backdrop-blur-md overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-//           <div className="p-6 border-b border-slate-800 flex items-center justify-between">
-//             <div className="flex items-center gap-2">
-//               <Eye className="h-5 w-5 text-blue-400" />
-//               <h2 className="text-lg font-bold text-white uppercase tracking-wider">
-//                 Preview 5 Data Teratas
-//               </h2>
-//             </div>
-//           </div>
-//           <CardContent className="p-0">
-//             <div className="overflow-x-auto">
-//               <Table>
-//                 <TableHeader className="bg-slate-950">
-//                   <TableRow className="border-slate-800">
-//                     {Object.keys(dataPreview[0]).map((key) => (
-//                       <TableHead
-//                         key={key}
-//                         className="text-slate-400 font-bold uppercase text-[10px] tracking-widest py-5"
-//                       >
-//                         {key}
-//                       </TableHead>
-//                     ))}
-//                   </TableRow>
-//                 </TableHeader>
-//                 <TableBody>
-//                   {dataPreview.map((row, i) => (
-//                     <TableRow
-//                       key={i}
-//                       className="border-slate-800 hover:bg-slate-800/30 transition-colors"
-//                     >
-//                       {Object.values(row).map((val: any, j) => (
-//                         <TableCell
-//                           key={j}
-//                           className="text-slate-300 text-sm py-4 font-medium"
-//                         >
-//                           {val}
-//                         </TableCell>
-//                       ))}
-//                     </TableRow>
-//                   ))}
-//                 </TableBody>
-//               </Table>
-//             </div>
-//             <div className="p-6 bg-slate-950/50 flex justify-end">
-//               <Button
-//                 onClick={handleSendToDirector}
-//                 className="bg-blue-600 hover:bg-blue-500 text-white font-black px-10 py-7 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.3)] border-none"
-//               >
-//                 KIRIM KE DIREKTUR <Send className="ml-3 h-5 w-5" />
-//               </Button>
-//             </div>
-//           </CardContent>
-//         </Card>
-//       )}
-//     </div>
-//   );
-// }

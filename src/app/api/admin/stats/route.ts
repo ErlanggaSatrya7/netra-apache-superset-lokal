@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // Menghitung total transaksi, profit, dan sales dari database adidas
-    const totalTransactions = await prisma.transaction.count();
-    const aggregateData = await prisma.transaction.aggregate({
+    // Menghitung total dari database sesuai kolom dataset kamu
+    const stats = await prisma.transaction.aggregate({
+      where: { is_approved: true },
       _sum: {
-        operating_profit: true,
         total_sales: true,
         unit_sold: true,
+        operating_profit: true,
       },
     });
 
+    // Menghitung jumlah produk unik (Active SKU)
+    const products = await prisma.transaction.groupBy({
+      by: ["product"],
+    });
+
     return NextResponse.json({
-      totalTransactions,
-      totalProfit: aggregateData._sum.operating_profit || 0,
-      totalSales: aggregateData._sum.total_sales || 0,
-      totalUnits: aggregateData._sum.unit_sold || 0,
+      totalSales: stats._sum.total_sales || 0,
+      profit: stats._sum.operating_profit || 0,
+      units: stats._sum.unit_sold || 0,
+      productCount: products.length,
     });
   } catch (error) {
-    return NextResponse.json(
-      { message: "Gagal mengambil data" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Gagal memuat data" }, { status: 500 });
   }
 }
