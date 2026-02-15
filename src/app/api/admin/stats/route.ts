@@ -1,32 +1,23 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // Menghitung total dari database sesuai kolom dataset kamu
-    const stats = await prisma.transaction.aggregate({
-      where: { is_approved: true },
-      _sum: {
-        total_sales: true,
-        unit_sold: true,
-        operating_profit: true,
-      },
-    });
-
-    // Menghitung jumlah produk unik (Active SKU)
-    const products = await prisma.transaction.groupBy({
-      by: ["product"],
-    });
+    const [revenue, transactions, pending] = await Promise.all([
+      prisma.transaction.aggregate({
+        where: { is_approved: true },
+        _sum: { total_sales: true },
+      }),
+      prisma.transaction.count({ where: { is_approved: true } }),
+      prisma.upload_history.count({ where: { status: "PENDING" } }),
+    ]);
 
     return NextResponse.json({
-      totalSales: stats._sum.total_sales || 0,
-      profit: stats._sum.operating_profit || 0,
-      units: stats._sum.unit_sold || 0,
-      productCount: products.length,
+      revenue: Number(revenue._sum.total_sales) || 0,
+      transactions: transactions || 0,
+      pending: pending || 0,
     });
   } catch (error) {
-    return NextResponse.json({ error: "Gagal memuat data" }, { status: 500 });
+    return NextResponse.json({ revenue: 0, transactions: 0, pending: 0 });
   }
 }

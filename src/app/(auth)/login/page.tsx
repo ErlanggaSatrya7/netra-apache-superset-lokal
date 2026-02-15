@@ -1,219 +1,183 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ShieldCheck,
+  Lock,
+  User,
+  Zap,
+  ArrowRight,
+  Loader2,
+  Eye,
+  EyeOff,
+  Terminal,
+  Activity,
+  Network,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, ArrowRight, Zap } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function LoginPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState(""); // Menambahkan state password
+export default function AdidasDatabaseLogin() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [sysStatus, setSysStatus] = useState("AWAITING_IDENT");
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSystemAccess = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setSysStatus("QUERYING_DATABASE");
 
     try {
-      // Memanggil API Login asli yang terhubung ke database
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
+      const result = await res.json();
 
-      if (res.ok) {
-        toast.success(
-          `Selamat Datang, ${data.role === "admin" ? "Direktur" : "Staff"}`
-        );
+      if (!res.ok)
+        throw new Error(result.details || "Database rejected connection.");
 
-        // Redirect berdasarkan role yang dikirim dari database
-        if (data.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/staff/upload");
-        }
-      } else {
-        // Menampilkan pesan error jika email/password salah
-        toast.error(data.message || "Login Gagal");
-      }
-    } catch (error) {
-      toast.error("Gagal terhubung ke server database");
+      setSysStatus("HANDSHAKE_OK");
+      toast.success("ACCESS_GRANTED", {
+        description: `Welcome back, ${result.user.name}.`,
+      });
+
+      // Redirect sesuai role dari Database
+      router.push(result.redirect);
+      router.refresh();
+    } catch (err: any) {
+      setSysStatus("ERROR_MISMATCH");
+      toast.error("AUTH_FAILED", { description: err.message });
+      setFormData((p) => ({ ...p, password: "" }));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-4">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
-      <Card className="w-full max-w-md border-slate-800 bg-slate-900/50 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400" />
-        <CardHeader className="space-y-2 text-center pt-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)]">
-            <Zap className="h-8 w-8 text-white fill-white" />
+    <div className="min-h-screen w-full bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Cyberpunk Effect */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px]" />
+
+      <div className="w-full max-w-[1000px] grid grid-cols-1 lg:grid-cols-2 bg-[#0f172a]/50 backdrop-blur-3xl rounded-[3rem] border border-white/5 shadow-2xl overflow-hidden z-10">
+        {/* Branding Info */}
+        <div className="hidden lg:flex flex-col p-16 justify-between border-r border-white/5 bg-gradient-to-b from-primary/10 to-transparent">
+          <div className="space-y-8">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.5)]">
+                <ShieldCheck className="text-white" />
+              </div>
+              <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase">
+                DataVortex
+              </h1>
+            </div>
+            <h2 className="text-5xl font-black text-white italic tracking-tighter uppercase leading-none">
+              Adidas
+              <br />
+              <span className="text-primary">Intelligence</span>
+              <br />
+              Port.
+            </h2>
+            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest leading-relaxed italic">
+              Enterprise data bridge developed by{" "}
+              <span className="text-white">Netra.ai</span> for Adidas Global
+              sets.
+            </p>
           </div>
-          <CardTitle className="text-4xl font-black tracking-tighter text-white uppercase italic">
-            DATAVORTEX
-          </CardTitle>
-          <CardDescription className="text-slate-400 font-medium italic">
-            Portal PT Netra Vidya Analitika
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-6 pt-4">
-            <div className="space-y-2 text-white">
-              <Label>Email Perusahaan</Label>
-              <Input
-                type="email"
-                placeholder="angga@netra.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-slate-950 border-slate-800"
-              />
+          <div className="font-mono text-[9px] text-slate-600 uppercase tracking-tighter italic">
+            &gt; STABLE_DATABASE_CONNECTION_ESTABLISHED
+          </div>
+        </div>
+
+        {/* Login Form */}
+        <div className="p-10 md:p-20 flex flex-col justify-center">
+          <div className="mb-10">
+            <h3 className="text-2xl font-black italic text-white uppercase tracking-tighter">
+              Handshake_Protocol
+            </h3>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
+              <Network size={12} className="text-primary" /> Database
+              Authorization Required
+            </p>
+          </div>
+
+          <form onSubmit={handleSystemAccess} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-slate-500 tracking-[0.3em] ml-4">
+                  Credential_Ident
+                </label>
+                <Input
+                  required
+                  type="email"
+                  placeholder="name@netra.com"
+                  className="h-16 bg-[#020617] border-white/5 rounded-2xl pl-6 text-white outline-none focus:ring-1 ring-primary transition-all"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase text-slate-500 tracking-[0.3em] ml-4">
+                  Neural_Key
+                </label>
+                <div className="relative">
+                  <Input
+                    required
+                    type={showPass ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="h-16 bg-[#020617] border-white/5 rounded-2xl pl-6 pr-12 text-white outline-none focus:ring-1 ring-primary transition-all"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-600"
+                  >
+                    {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2 text-white">
-              <Label>Password</Label>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-slate-950 border-slate-800"
-              />
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4 pb-8">
+
             <Button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-500 font-bold py-7 shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all"
               disabled={isLoading}
+              className="w-full h-16 bg-primary hover:bg-blue-600 text-white rounded-2xl font-black uppercase italic tracking-widest shadow-2xl shadow-primary/20"
             >
               {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>MEMVERIFIKASI...</span>
-                </div>
+                <Loader2 className="animate-spin" />
               ) : (
-                <>
-                  LOGIN SISTEM <ArrowRight className="ml-2 h-5 w-5" />
-                </>
+                "Authorize Link"
               )}
             </Button>
-          </CardFooter>
-        </form>
-      </Card>
+          </form>
+
+          {/* Real-time Status */}
+          <div className="mt-12 p-4 bg-black/40 rounded-2xl border border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Activity size={14} className="text-primary animate-pulse" />
+              <span className="text-[9px] font-black text-slate-500 uppercase italic">
+                Status: {sysStatus}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,1)]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-// "use client";
-
-// import { useState } from "react";
-// import { useRouter } from "next/navigation";
-// import { Button } from "@/components/ui/button";
-// import {
-//   Card,
-//   CardContent,
-//   CardDescription,
-//   CardFooter,
-//   CardHeader,
-//   CardTitle,
-// } from "@/components/ui/card";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
-// import { toast } from "sonner";
-// import { Loader2, ArrowRight, Zap } from "lucide-react";
-
-// export default function LoginPage() {
-//   const [isLoading, setIsLoading] = useState(false);
-//   const [email, setEmail] = useState("");
-//   const router = useRouter();
-
-//   const handleLogin = async (e: React.FormEvent) => {
-//     e.preventDefault();
-//     setIsLoading(true);
-//     setTimeout(() => {
-//       setIsLoading(false);
-//       if (email.toLowerCase().includes("admin")) {
-//         toast.success("Login Berhasil sebagai Direktur");
-//         router.push("/admin");
-//       } else {
-//         toast.success("Login Berhasil sebagai Staff");
-//         router.push("/staff/upload");
-//       }
-//     }, 1500);
-//   };
-
-//   return (
-//     <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-4">
-//       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
-//       <Card className="w-full max-w-md border-slate-800 bg-slate-900/50 backdrop-blur-xl shadow-2xl relative overflow-hidden">
-//         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-cyan-400" />
-//         <CardHeader className="space-y-2 text-center pt-8">
-//           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)]">
-//             <Zap className="h-8 w-8 text-white fill-white" />
-//           </div>
-//           <CardTitle className="text-4xl font-black tracking-tighter text-white uppercase italic">
-//             DATAVORTEX
-//           </CardTitle>
-//           <CardDescription className="text-slate-400 font-medium italic">
-//             Portal PT Netra Vidya Analitika
-//           </CardDescription>
-//         </CardHeader>
-//         <form onSubmit={handleLogin}>
-//           <CardContent className="space-y-6 pt-4">
-//             <div className="space-y-2 text-white">
-//               <Label>Email Perusahaan</Label>
-//               <Input
-//                 type="email"
-//                 value={email}
-//                 onChange={(e) => setEmail(e.target.value)}
-//                 required
-//                 className="bg-slate-950 border-slate-800"
-//               />
-//             </div>
-//             <div className="space-y-2 text-white">
-//               <Label>Password</Label>
-//               <Input
-//                 type="password"
-//                 required
-//                 className="bg-slate-950 border-slate-800"
-//               />
-//             </div>
-//           </CardContent>
-//           <CardFooter className="flex flex-col space-y-4 pb-8">
-//             <Button
-//               className="w-full bg-blue-600 font-bold py-7 shadow-[0_0_15px_rgba(37,99,235,0.4)]"
-//               disabled={isLoading}
-//             >
-//               {isLoading ? (
-//                 <Loader2 className="animate-spin" />
-//               ) : (
-//                 <>
-//                   LOGIN SISTEM <ArrowRight className="ml-2 h-5 w-5" />
-//                 </>
-//               )}
-//             </Button>
-//           </CardFooter>
-//         </form>
-//       </Card>
-//     </div>
-//   );
-// }

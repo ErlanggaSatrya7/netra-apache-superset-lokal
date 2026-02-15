@@ -1,33 +1,34 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma";
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
-    const { ids, action } = await req.json();
+    const { id_upload, action, note } = await req.json();
 
     if (action === "APPROVE") {
-      await prisma.transaction.updateMany({
-        where: { id_transaction: { in: ids } },
-        data: { is_approved: true },
-      });
-      return NextResponse.json({ message: "Data Berhasil Disetujui!" });
+      await prisma.$transaction([
+        // 1. Update status history
+        prisma.upload_history.update({
+          where: { id_upload },
+          data: { status: "APPROVED" },
+        }),
+        // 2. Set semua transaksi di file ini menjadi Approved
+        prisma.transaction.updateMany({
+          where: { id_upload },
+          data: { is_approved: true },
+        }),
+      ]);
+      return NextResponse.json({ message: "Data Approved & Published!" });
     }
 
     if (action === "REJECT") {
-      // Jika direject, kita hapus datanya agar staff bisa upload ulang yang benar
-      await prisma.transaction.deleteMany({
-        where: { id_transaction: { in: ids } },
+      await prisma.upload_history.update({
+        where: { id_upload },
+        data: { status: "REJECTED", note: note },
       });
-      return NextResponse.json({ message: "Data Berhasil Ditolak & Dihapus!" });
+      return NextResponse.json({ message: "Data Rejected with note." });
     }
-
-    return NextResponse.json(
-      { message: "Aksi tidak dikenal" },
-      { status: 400 }
-    );
-  } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ message: "Operation failed" }, { status: 500 });
   }
 }

@@ -1,43 +1,29 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
-    const user = await prisma.users.findUnique({
-      where: { email: email.toLowerCase().trim() },
+    const user = await prisma.user.findFirst({
+      where: { email, password }, // Sesuai request: tanpa hash untuk demo
     });
 
-    // Cek apakah user ada
     if (!user) {
       return NextResponse.json(
-        { message: "Email atau Password salah!" },
-        { status: 401 }
-      );
-    }
-
-    // BANDINGKAN TEKS LANGSUNG (Tanpa Bcrypt)
-    const isMatch = password === user.password;
-
-    if (!isMatch) {
-      return NextResponse.json(
-        { message: "Email atau Password salah!" },
+        { message: "Kredensial salah" },
         { status: 401 }
       );
     }
 
     return NextResponse.json({
-      message: "Sukses",
-      user: { id: user.id, email: user.email },
+      message: "Login Berhasil",
+      user: {
+        email: user.email,
+        role: user.role, // ADMIN atau STAFF
+      },
     });
-  } catch (error: any) {
-    console.error("LOGIN ERROR:", error);
-    return NextResponse.json(
-      { message: "Terjadi kesalahan server" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return NextResponse.json({ message: "Server Error" }, { status: 500 });
   }
 }

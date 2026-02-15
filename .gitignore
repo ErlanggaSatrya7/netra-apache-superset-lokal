@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -30,8 +31,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# environment variables
+# SANGAT PENTING: Menjaga kredensial database agar tetap rahasia
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Izinkan file template env untuk dokumentasi
+!.env.example
 
 # vercel
 .vercel
@@ -40,4 +49,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma & database
+*.db
+*.db-journal
 /src/generated/prisma
+
+# public uploads (opsional)
+/public/uploads/*
+!/public/uploads/.gitkeep

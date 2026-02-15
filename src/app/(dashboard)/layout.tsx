@@ -1,19 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  UploadCloud,
-  Database,
-  UserCheck,
-  Settings,
-  LogOut,
-  Zap,
-  BarChart3,
-  Users,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect } from "react";
+import SidebarResponsive from "@/components/shared/SidebarResponsive";
+import { usePathname, useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Loader2, ShieldCheck, Activity, Terminal, Cpu } from "lucide-react";
 
 export default function DashboardLayout({
   children,
@@ -21,390 +12,65 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isAdminArea = pathname.startsWith("/admin");
-  const settingsHref = isAdminArea ? "/admin/settings" : "/staff/settings";
+  const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
 
-  const staffMenus = [
-    { name: "My Dashboard", href: "/staff", icon: LayoutDashboard },
-    { name: "Upload Adidas", href: "/staff/upload", icon: UploadCloud },
-    { name: "History Upload", href: "/staff/history", icon: Database },
-  ];
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
-  const adminMenus = [
-    { name: "Executive Dashboard", href: "/admin", icon: BarChart3 },
-    { name: "Approval Queue", href: "/admin/approval", icon: UserCheck },
-    { name: "Staff Management", href: "/admin/management", icon: Users },
-  ];
+  const isStaff = pathname.startsWith("/staff");
+  const role = isStaff ? "staff" : "admin";
 
-  const activeMenus = isAdminArea ? adminMenus : staffMenus;
+  const handleLogout = () => {
+    document.cookie =
+      "vortex_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    document.cookie =
+      "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+    toast.success("SYSTEM_TERMINATED", {
+      description: "Netra Node connection closed.",
+    });
+    router.push("/login");
+    router.refresh();
+  };
+
+  if (!isMounted) return null;
 
   return (
-    <div className="flex min-h-screen bg-[#020617] text-slate-200">
-      {/* SIDEBAR - Menggunakan bg-slate-950 solid agar tidak tembus */}
-      <aside className="w-72 border-r border-slate-800 bg-slate-950 fixed h-full z-[100] flex flex-col shadow-2xl">
-        <div className="p-8 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
-            <Zap className="text-white fill-white h-6 w-6" />
-          </div>
-          <span className="text-xl font-black text-white italic tracking-tighter">
-            DATAVORTEX
-          </span>
-        </div>
+    <div className="flex min-h-screen bg-[#020617] text-slate-100 antialiased overflow-x-hidden">
+      {/* SIDEBAR: Fixed position, width w-72 (18rem) */}
+      <SidebarResponsive role={role} onLogout={handleLogout} />
 
-        <div className="px-6 mb-6">
-          <div
-            className={cn(
-              "text-[10px] font-black uppercase tracking-[3px] px-3 py-1.5 rounded-lg border w-fit",
-              isAdminArea
-                ? "text-red-400 border-red-500/20 bg-red-500/10"
-                : "text-blue-400 border-blue-500/20 bg-blue-500/10"
-            )}
-          >
-            {isAdminArea ? "Director Mode" : "Staff Mode"}
+      {/* MAIN CONTENT AREA: 
+          - Desktop: pl-72 (Memberi ruang untuk sidebar)
+          - Mobile: pl-0 (Sidebar biasanya menjadi menu hamburger/hidden)
+      */}
+      <div className="flex-1 flex flex-col min-w-0 md:pl-72 transition-all duration-300">
+        <main className="flex-1 p-4 md:p-10 lg:p-12 max-w-[1600px] mx-auto w-full relative z-10">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {children}
           </div>
-        </div>
+        </main>
 
-        <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
-          {activeMenus.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
-                pathname === item.href
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                  : "text-slate-400 hover:bg-slate-900 hover:text-white"
-              )}
-            >
-              <item.icon
-                className={cn(
-                  "h-5 w-5",
-                  pathname === item.href
-                    ? "text-white"
-                    : "group-hover:text-blue-400"
-                )}
-              />
-              <span className="font-bold text-sm tracking-tight">
-                {item.name}
+        {/* Footer System Status - Pas di bawah content */}
+        <footer className="p-6 border-t border-white/5 bg-[#020617]/50 backdrop-blur-md">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black uppercase italic text-slate-600 tracking-widest">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />{" "}
+                Node_Active
               </span>
-            </Link>
-          ))}
-        </nav>
+              <span className="opacity-40">|</span>
+              <span>Encrypted_Link: AES_256</span>
+            </div>
+            <p>© 2024 Netra Intelligence Hub - Adidas Portfolio v2.0</p>
+          </div>
+        </footer>
+      </div>
 
-        <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-1">
-          <Link
-            href={settingsHref}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-              pathname === settingsHref
-                ? "bg-slate-900 text-white"
-                : "text-slate-400 hover:bg-slate-900"
-            )}
-          >
-            <Settings className="h-5 w-5" />
-            <span className="text-sm font-medium">Settings</span>
-          </Link>
-          <Link
-            href="/login"
-            className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-400 transition-colors"
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="text-sm font-medium">Sign Out</span>
-          </Link>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT - Margin left harus sama dengan lebar sidebar (w-72 = ml-72) */}
-      <main className="flex-1 ml-72 min-h-screen relative z-10">
-        <div className="p-10 max-w-7xl mx-auto">{children}</div>
-      </main>
+      {/* Decorative Blur Backgrounds - Tetap di belakang */}
+      <div className="fixed top-0 right-0 w-1/2 h-1/2 bg-primary/5 rounded-full blur-[150px] -z-0 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-1/2 h-1/2 bg-emerald-500/5 rounded-full blur-[150px] -z-0 pointer-events-none" />
     </div>
   );
 }
-
-// // versi baru
-
-// "use client";
-
-// import Link from "next/link";
-// import { usePathname } from "next/navigation";
-// import {
-//   LayoutDashboard,
-//   UploadCloud,
-//   Database,
-//   UserCheck,
-//   Settings,
-//   LogOut,
-//   Zap,
-//   BarChart3,
-//   Users,
-// } from "lucide-react";
-// import { cn } from "@/lib/utils";
-
-// export default function DashboardLayout({
-//   children,
-// }: {
-//   children: React.ReactNode;
-// }) {
-//   const pathname = usePathname();
-//   const isAdminArea = pathname.startsWith("/admin");
-//   const settingsHref = isAdminArea ? "/admin/settings" : "/staff/settings";
-
-//   const staffMenus = [
-//     { name: "My Dashboard", href: "/staff", icon: LayoutDashboard },
-//     { name: "Upload Adidas", href: "/staff/upload", icon: UploadCloud },
-//     { name: "History Upload", href: "/staff/history", icon: Database },
-//   ];
-
-//   const adminMenus = [
-//     { name: "Executive Dashboard", href: "/admin", icon: BarChart3 },
-//     { name: "Approval Queue", href: "/admin/approval", icon: UserCheck },
-//     { name: "Staff Management", href: "/admin/management", icon: Users },
-//   ];
-
-//   const activeMenus = isAdminArea ? adminMenus : staffMenus;
-
-//   return (
-//     <div className="flex min-h-screen bg-[#020617] text-slate-200">
-//       {/* SIDEBAR - Menggunakan bg-slate-950 solid agar tidak tembus */}
-//       <aside className="w-72 border-r border-slate-800 bg-slate-950 fixed h-full z-[100] flex flex-col shadow-2xl">
-//         <div className="p-8 flex items-center gap-3">
-//           <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
-//             <Zap className="text-white fill-white h-6 w-6" />
-//           </div>
-//           <span className="text-xl font-black text-white italic tracking-tighter">
-//             DATAVORTEX
-//           </span>
-//         </div>
-
-//         <div className="px-6 mb-6">
-//           <div
-//             className={cn(
-//               "text-[10px] font-black uppercase tracking-[3px] px-3 py-1.5 rounded-lg border w-fit",
-//               isAdminArea
-//                 ? "text-red-400 border-red-500/20 bg-red-500/10"
-//                 : "text-blue-400 border-blue-500/20 bg-blue-500/10"
-//             )}
-//           >
-//             {isAdminArea ? "Director Mode" : "Staff Mode"}
-//           </div>
-//         </div>
-
-//         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
-//           {activeMenus.map((item) => (
-//             <Link
-//               key={item.href}
-//               href={item.href}
-//               className={cn(
-//                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
-//                 pathname === item.href
-//                   ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-//                   : "text-slate-400 hover:bg-slate-900 hover:text-white"
-//               )}
-//             >
-//               <item.icon
-//                 className={cn(
-//                   "h-5 w-5",
-//                   pathname === item.href
-//                     ? "text-white"
-//                     : "group-hover:text-blue-400"
-//                 )}
-//               />
-//               <span className="font-bold text-sm tracking-tight">
-//                 {item.name}
-//               </span>
-//             </Link>
-//           ))}
-//         </nav>
-
-//         <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-1">
-//           <Link
-//             href={settingsHref}
-//             className={cn(
-//               "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-//               pathname === settingsHref
-//                 ? "bg-slate-900 text-white"
-//                 : "text-slate-400 hover:bg-slate-900"
-//             )}
-//           >
-//             <Settings className="h-5 w-5" />
-//             <span className="text-sm font-medium">Settings</span>
-//           </Link>
-//           <Link
-//             href="/login"
-//             className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-400 transition-colors"
-//           >
-//             <LogOut className="h-5 w-5" />
-//             <span className="text-sm font-medium">Sign Out</span>
-//           </Link>
-//         </div>
-//       </aside>
-
-//       {/* MAIN CONTENT - Margin left harus sama dengan lebar sidebar (w-72 = ml-72) */}
-//       <main className="flex-1 ml-72 min-h-screen relative z-10">
-//         <div className="p-10 max-w-7xl mx-auto">{children}</div>
-//       </main>
-//     </div>
-//   );
-// }
-
-// // layout.tsx
-// "use client";
-
-// import {
-//   SidebarProvider,
-//   SidebarInset,
-//   SidebarTrigger,
-// } from "@/components/ui/sidebar";
-// import { AppSidebar } from "@/components/ui/app-sidebar";
-
-// export default function DashboardLayout({
-//   children,
-// }: {
-//   children: React.ReactNode;
-// }) {
-//   return (
-//     <SidebarProvider>
-//       <div className="flex min-h-screen w-full bg-[#0a0a0a]">
-//         {/* Role dikirim secara dinamis dari sesi user */}
-//         <AppSidebar role="admin" />
-//         <SidebarInset className="bg-[#0a0a0a] text-white border-none">
-//           <header className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-800 px-4">
-//             <SidebarTrigger className="text-blue-500" />
-//             <div className="h-4 w-[1px] bg-slate-800 mx-2" />
-//             <span className="text-xs font-bold uppercase tracking-widest text-slate-500 italic">
-//               DataVortex Engine v2.0
-//             </span>
-//           </header>
-//           <div className="flex flex-1 flex-col gap-4 p-6">{children}</div>
-//         </SidebarInset>
-//       </div>
-//     </SidebarProvider>
-//   );
-// }
-
-// versi lama
-
-// "use client";
-
-// import Link from "next/link";
-// import { usePathname } from "next/navigation";
-// import {
-//   LayoutDashboard,
-//   UploadCloud,
-//   Database,
-//   UserCheck,
-//   Settings,
-//   LogOut,
-//   Zap,
-//   BarChart3,
-//   Users,
-// } from "lucide-react";
-// import { cn } from "@/lib/utils";
-
-// export default function DashboardLayout({
-//   children,
-// }: {
-//   children: React.ReactNode;
-// }) {
-//   const pathname = usePathname();
-//   const isAdminArea = pathname.startsWith("/admin");
-//   const settingsHref = isAdminArea ? "/admin/settings" : "/staff/settings";
-
-//   const staffMenus = [
-//     { name: "My Dashboard", href: "/staff", icon: LayoutDashboard },
-//     { name: "Upload Adidas", href: "/staff/upload", icon: UploadCloud },
-//     { name: "History Upload", href: "/staff/history", icon: Database },
-//   ];
-
-//   const adminMenus = [
-//     { name: "Executive Dashboard", href: "/admin", icon: BarChart3 },
-//     { name: "Approval Queue", href: "/admin/approval", icon: UserCheck },
-//     { name: "Staff Management", href: "/admin/management", icon: Users },
-//   ];
-
-//   const activeMenus = isAdminArea ? adminMenus : staffMenus;
-
-//   return (
-//     <div className="flex min-h-screen bg-[#020617] text-slate-200">
-//       {/* SIDEBAR - Fixed & Solid Background */}
-//       <aside className="w-72 border-r border-slate-800 bg-slate-950 fixed h-full z-[60] flex flex-col shadow-2xl">
-//         <div className="p-8 flex items-center gap-3">
-//           <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
-//             <Zap className="text-white fill-white h-6 w-6" />
-//           </div>
-//           <span className="text-xl font-black text-white italic tracking-tighter">
-//             DATAVORTEX
-//           </span>
-//         </div>
-
-//         <div className="px-6 mb-6">
-//           <div
-//             className={cn(
-//               "text-[10px] font-black uppercase tracking-[3px] px-3 py-1.5 rounded-lg border w-fit",
-//               isAdminArea
-//                 ? "text-red-400 border-red-500/20 bg-red-500/10"
-//                 : "text-blue-400 border-blue-500/20 bg-blue-500/10"
-//             )}
-//           >
-//             {isAdminArea ? "Director Mode" : "Staff Mode"}
-//           </div>
-//         </div>
-
-//         <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
-//           {activeMenus.map((item) => (
-//             <Link
-//               key={item.href}
-//               href={item.href}
-//               className={cn(
-//                 "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
-//                 pathname === item.href
-//                   ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-//                   : "text-slate-400 hover:bg-slate-900 hover:text-white"
-//               )}
-//             >
-//               <item.icon
-//                 className={cn(
-//                   "h-5 w-5",
-//                   pathname === item.href
-//                     ? "text-white"
-//                     : "group-hover:text-blue-400"
-//                 )}
-//               />
-//               <span className="font-bold text-sm tracking-tight">
-//                 {item.name}
-//               </span>
-//             </Link>
-//           ))}
-//         </nav>
-
-//         <div className="p-4 border-t border-slate-900 bg-slate-950/50 space-y-1">
-//           <Link
-//             href={settingsHref}
-//             className={cn(
-//               "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-//               pathname === settingsHref
-//                 ? "bg-slate-900 text-white"
-//                 : "text-slate-400 hover:bg-slate-900"
-//             )}
-//           >
-//             <Settings className="h-5 w-5" />
-//             <span className="text-sm font-medium">Settings</span>
-//           </Link>
-//           <Link
-//             href="/login"
-//             className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-400 transition-colors"
-//           >
-//             <LogOut className="h-5 w-5" />
-//             <span className="text-sm font-medium">Sign Out</span>
-//           </Link>
-//         </div>
-//       </aside>
-
-//       {/* MAIN CONTENT - Added margin to prevent overlap */}
-//       <main className="flex-1 ml-72 min-h-screen relative z-10">
-//         <div className="p-10 max-w-7xl mx-auto">{children}</div>
-//       </main>
-//     </div>
-//   );
-// }

@@ -1,25 +1,27 @@
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const email = searchParams.get("email") || "staff@netra.com";
 
-export async function GET() {
   try {
-    // Menghitung data real dari database
-    const total = await prisma.transaction.count();
-    const pending = await prisma.transaction.count({
-      where: { is_approved: false },
+    const stats = await prisma.upload_history.groupBy({
+      by: ["status"],
+      where: { uploaded_by: email },
+      _count: { _all: true },
     });
 
-    return NextResponse.json({
-      totalTransaksi: total,
-      menungguAcc: pending,
-      disetujui: 0,
-      ditolak: 0,
-    });
+    const formatted = {
+      pending: stats.find((s) => s.status === "PENDING")?._count._all || 0,
+      approved: stats.find((s) => s.status === "APPROVED")?._count._all || 0,
+      rejected: stats.find((s) => s.status === "REJECTED")?._count._all || 0,
+    };
+
+    return NextResponse.json(formatted);
   } catch (error) {
     return NextResponse.json(
-      { error: "Gagal mengambil data" },
+      { error: "Failed to fetch staff analytics" },
       { status: 500 }
     );
   }

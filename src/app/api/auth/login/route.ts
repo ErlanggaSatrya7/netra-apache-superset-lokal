@@ -1,49 +1,37 @@
-// versi 2
-
+import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@/generated/prisma"; // Gunakan folder sesuai log generate kamu
 
 const prisma = new PrismaClient();
 
-// WAJIB menggunakan huruf kapital semua: POST
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
     // 1. Cari user berdasarkan email
     const user = await prisma.users.findUnique({
-      where: { email: email },
+      where: { email },
     });
 
-    // 2. Validasi Akun & Password
+    // 2. Cek password (Bandingkan teks langsung)
     if (!user || user.password !== password) {
       return NextResponse.json(
-        { message: "Email atau Password salah!" },
+        { message: "Email atau password salah" },
         { status: 401 }
       );
     }
 
-    // 3. Logika Role (Admin/Staff)
-    const role = email.toLowerCase().includes("admin") ? "admin" : "staff";
-
+    // 3. Jika benar, kirim data user & role
     return NextResponse.json({
       message: "Login Berhasil",
-      role: role,
-      email: user.email,
+      user: {
+        email: user.email,
+        role: user.role,
+      },
     });
-  } catch (error: any) {
-    console.error("Login Error:", error);
+  } catch (error) {
     return NextResponse.json(
-      { message: "Gagal terhubung ke database: " + error.message },
+      { message: "Internal Server Error" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
-
-// versi 1
-// // import { PrismaClient } from "@/generated/prisma";
-// import { PrismaClient } from "@prisma/client";
-// // ^ pastikan ini mengarah ke folder tempat 'npx prisma generate' kamu bersarang
-// const prisma = new PrismaClient();
