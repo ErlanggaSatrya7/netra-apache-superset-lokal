@@ -1,157 +1,109 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  FileText,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-} from "lucide-react";
+import React from "react";
+import EchartNode from "@/components/titan-visuals/EchartNode";
+import D3FluidGraph from "@/components/titan-visuals/D3FluidGraph";
+import { Card } from "@/components/ui/card";
+import { Activity, Zap, Layers, Network, Loader2 } from "lucide-react";
+import { useNeuralSync } from "@/hooks/use-neural-sync";
+import { cn } from "@/lib/utils"; // FIX: cn IMPORTED
 
-export default function StaffHistoryPage() {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function StaffPerformanceNode() {
+  const { intel, loading } = useNeuralSync();
 
-  const loadHistory = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/staff?email=staff@netra.com"); // Paksa ambil data terbaru
-      const data = await res.json();
-      setHistory(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Fetch error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadHistory();
-  }, []);
+  if (loading)
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-[10px] font-black uppercase tracking-[1em] text-slate-500">
+          Establishing_Neural_Sync...
+        </p>
+      </div>
+    );
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-black italic uppercase text-white tracking-tighter">
-          Transmission <span className="text-primary">Logs</span>
-        </h1>
-        <button
-          onClick={loadHistory}
-          className="text-[10px] font-black uppercase text-primary border border-primary/20 px-4 py-2 rounded-lg hover:bg-primary/10 transition-all"
-        >
-          Refresh Logs
-        </button>
+    <div className="space-y-12 pb-40 animate-in fade-in duration-1000">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {[
+          {
+            label: "My Uplinks",
+            val: intel?.allHistory?.length || 0,
+            color: "text-primary",
+            icon: Activity,
+          },
+          {
+            label: "Nodes Transmitted",
+            val: intel?.stats?.records || 0,
+            color: "text-emerald-400",
+            icon: Layers,
+          },
+          {
+            label: "Node State",
+            val: "ACTIVE",
+            color: "text-amber-400",
+            icon: Zap,
+          },
+        ].map((k, i) => (
+          <Card
+            key={i}
+            className="bg-[#0f172a]/90 border-white/5 rounded-[2.5rem] p-10 h-44 flex items-center relative overflow-hidden shadow-2xl"
+          >
+            <div className="relative z-10 min-w-0">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-2">
+                {k.label}
+              </p>
+              <h3
+                className={cn(
+                  "text-4xl font-black italic tracking-tighter truncate",
+                  k.color
+                )}
+              >
+                {k.val}
+              </h3>
+            </div>
+            <k.icon
+              className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.03] text-white"
+              size={100}
+            />
+          </Card>
+        ))}
       </div>
 
-      <div className="vortex-glass overflow-hidden border-white/5 shadow-2xl">
-        <Table>
-          <TableHeader className="bg-slate-900/50">
-            <TableRow className="border-white/5">
-              <TableHead className="text-[10px] font-black uppercase py-5 px-6">
-                Dataset Entity
-              </TableHead>
-              <TableHead className="text-[10px] font-black uppercase">
-                Status
-              </TableHead>
-              <TableHead className="text-[10px] font-black uppercase text-right px-6">
-                Timestamp
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={3}
-                  className="h-40 text-center animate-pulse text-slate-500 font-bold italic uppercase tracking-widest"
-                >
-                  Accessing Logs...
-                </TableCell>
-              </TableRow>
-            ) : history.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={3}
-                  className="h-40 text-center text-slate-600 font-bold italic"
-                >
-                  No history detected.
-                </TableCell>
-              </TableRow>
-            ) : (
-              history.map((item: any) => (
-                <TableRow
-                  key={item.id_upload}
-                  className="border-white/5 hover:bg-white/5 transition-all"
-                >
-                  <TableCell className="py-5 px-6">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-3">
-                        <FileText size={16} className="text-primary" />
-                        <div>
-                          <p className="text-sm font-black text-white italic uppercase tracking-tight">
-                            {item.file_name}
-                          </p>
-                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">
-                            {item.system_name}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* REJECT FEEDBACK AREA */}
-                      {item.status === "REJECTED" && (
-                        <div className="mt-2 p-3 bg-red-600/10 border border-red-600/20 rounded-xl flex items-start gap-3">
-                          <AlertCircle
-                            size={14}
-                            className="text-red-500 mt-0.5"
-                          />
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-red-500">
-                              Admin Feedback:
-                            </p>
-                            <p className="text-[11px] text-slate-300 italic mt-1 leading-relaxed">
-                              "
-                              {item.note ||
-                                "Header mismatch or incorrect values."}
-                              "
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] font-black uppercase px-3 py-1 border-white/5 ${
-                        item.status === "APPROVED"
-                          ? "text-emerald-500 bg-emerald-500/5"
-                          : item.status === "REJECTED"
-                          ? "text-red-500 bg-red-500/5"
-                          : "text-amber-500 bg-amber-500/5"
-                      }`}
-                    >
-                      {item.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6 text-[10px] font-mono text-slate-500">
-                    {new Date(item.upload_date).toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 h-[700px]">
+        <Card className="xl:col-span-5 bg-[#0f172a]/60 backdrop-blur-3xl border-white/5 rounded-[4rem] p-16 shadow-2xl flex flex-col items-center justify-center">
+          <h3 className="text-2xl font-black italic uppercase text-white mb-10">
+            Entity Density
+          </h3>
+          <D3FluidGraph data={intel?.hierarchy} />
+        </Card>
+        <Card className="xl:col-span-7 bg-[#0f172a]/60 backdrop-blur-3xl border-white/5 rounded-[4rem] p-16 shadow-2xl">
+          <h3 className="text-2xl font-black italic uppercase text-white mb-10">
+            Regional Performance
+          </h3>
+          <EchartNode option={getStaffOption(intel)} />
+        </Card>
       </div>
     </div>
   );
+}
+
+function getStaffOption(intel: any) {
+  const cities = intel?.citySales?.map((c: any) => c.name) || [];
+  const vals = intel?.citySales?.map((c: any) => c.total) || [];
+  return {
+    backgroundColor: "transparent",
+    xAxis: {
+      type: "category",
+      data: cities,
+      axisLabel: { color: "#475569", fontSize: 10, rotate: 45 },
+    },
+    yAxis: { type: "value", splitLine: { lineStyle: { color: "#1e293b" } } },
+    series: [
+      {
+        data: vals,
+        type: "bar",
+        itemStyle: { color: "#3b82f6", borderRadius: [4, 4, 0, 0] },
+      },
+    ],
+  };
 }

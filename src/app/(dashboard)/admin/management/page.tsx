@@ -1,6 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -9,429 +17,237 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Database,
+  RefreshCw,
   Trash2,
-  Download,
-  Search,
-  Filter,
-  RefreshCcw,
-  FileText,
-  ShieldCheck,
-  HardDrive,
-  LayoutGrid,
-  List,
-  Calendar,
-  ArrowUpDown,
-  ChevronRight,
-  MoreHorizontal,
-  History,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Package,
-  Zap,
-  CloudDownload,
-  Terminal as TerminalIcon,
-  Eye,
   Layers,
-  FileSpreadsheet,
+  FileText,
+  CheckCircle2,
+  Wifi,
   Activity,
-  Globe,
-  Monitor,
-} from "lucide-react"; // FIX: Import Eye & ChevronRight here
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+  Terminal,
+  Eye,
+  ShieldCheck,
+  Box,
+  MessageCircle,
+  Edit3,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// --- Types & Interfaces ---
-interface WarehouseRecord {
-  id_transaction: number;
-  id_upload: number;
-  retailer: { retailer_name: string };
-  city: { city: string };
-  product: { product: string };
-  unit_sold: number;
-  total_sales: number;
-  operating_profit: number;
-  invoice_date: string;
-}
+export default function WarehouseTitan() {
+  const [loading, setLoading] = useState(true);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
 
-interface BatchLog {
-  id_upload: number;
-  file_name: string;
-  system_name: string;
-  status: string;
-  total_rows: number;
-  upload_date: string;
-  uploaded_by: string;
-}
-
-export default function AdidasWarehouseTerminal() {
-  const [activeTab, setActiveTab] = useState("inventory");
-  const [inventory, setInventory] = useState<WarehouseRecord[]>([]);
-  const [batches, setBatches] = useState<BatchLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortConfig, setSortConfig] = useState<{
-    key: string;
-    direction: "asc" | "desc";
-  } | null>(null);
-
-  // --- Neural Sync Protocol ---
-  const syncWarehouse = useCallback(async () => {
-    setIsLoading(true);
+  const fetchSync = useCallback(async () => {
+    setLoading(true);
     try {
-      const [resWarehouse, resHistory] = await Promise.all([
-        fetch("/api/shared").then((res) => res.json()),
-        fetch("/api/admin").then((res) => res.json()),
-      ]);
-
-      setInventory(Array.isArray(resWarehouse) ? resWarehouse : []);
-      setBatches(
-        Array.isArray(resHistory)
-          ? resHistory.filter((b: any) => b.status === "APPROVED")
-          : []
-      );
-
-      toast.success("NETRA_WAREHOUSE_SYNC_OK", {
-        description: `Stream established: ${
-          resWarehouse.length || 0
-        } active nodes detected.`,
-      });
-    } catch (err) {
-      toast.error("PROTOCOL_ERROR", {
-        description: "Failed to establish database handshake.",
-      });
+      const res = await fetch("/api/shared");
+      const data = await res.json();
+      setInventory(data.approvedData || []); // Data gabungan Vortex
+      setBatches(data.datasets || []); // Data per batch file
+    } catch (e) {
+      toast.error("SYNC_ERROR");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    syncWarehouse();
-  }, [syncWarehouse]);
-
-  // --- Analytical Logic ---
-  const filteredInventory = useMemo(() => {
-    let result = [...inventory];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (item) =>
-          item.retailer?.retailer_name.toLowerCase().includes(q) ||
-          item.product?.product.toLowerCase().includes(q) ||
-          item.city?.city.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [inventory, searchQuery]);
-
-  const handlePurgeBatch = async (id: number) => {
-    if (!confirm("CRITICAL: Permanent deletion protocol. Are you sure?"))
-      return;
-    const load = toast.loading("Executing purge...");
-    try {
-      const res = await fetch(`/api/admin?id_upload=${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error();
-      setBatches((prev) => prev.filter((b) => b.id_upload !== id));
-      toast.success("Batch Purged", { id: load });
-    } catch (err) {
-      toast.error("Purge Failed", { id: load });
-    }
-  };
+    fetchSync();
+  }, [fetchSync]);
 
   return (
-    <div className="flex flex-col space-y-10 min-h-screen animate-in fade-in duration-1000">
-      {/* HEADER WAR ROOM */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 border-b border-white/5 pb-10">
-        <div className="space-y-4">
+    <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-10 pb-40 animate-in fade-in duration-1000">
+      {/* COMMAND HEADER */}
+      <div className="flex justify-between items-end border-b border-white/5 pb-8">
+        <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
-              <TerminalIcon className="text-primary w-5 h-5" />
-            </div>
-            <span className="text-[10px] font-black text-primary uppercase tracking-[0.4em] italic">
-              Netra Master Node v2.0
+            <ShieldCheck size={16} className="text-emerald-500" />
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.5em]">
+              Storage_Protocol_v16.5
             </span>
           </div>
-          <h1 className="text-7xl font-black italic tracking-tighter text-white uppercase leading-none">
-            Adidas{" "}
-            <span className="text-primary font-sans lowercase tracking-normal">
-              Warehouse
-            </span>
+          <h1 className="text-5xl font-black italic text-white uppercase tracking-tighter leading-none">
+            Netra <span className="text-primary font-sans">Warehouse</span>
           </h1>
-          <p className="text-[11px] text-slate-500 font-bold uppercase tracking-[0.5em] italic">
-            Proprietary Ingestion Buffer & Global Master Inventory
-          </p>
         </div>
-
-        <div className="flex flex-wrap gap-4">
-          <Button
-            onClick={syncWarehouse}
-            disabled={isLoading}
-            variant="outline"
-            className="h-16 px-8 bg-[#0f172a] border-white/10 rounded-2xl"
-          >
-            {isLoading ? (
-              <Loader2 className="animate-spin mr-2" />
-            ) : (
-              <RefreshCcw size={18} className="mr-2 text-primary" />
+        <Button
+          onClick={fetchSync}
+          variant="outline"
+          className="h-14 w-14 rounded-2xl bg-[#0f172a] border-white/5 group shadow-2xl"
+        >
+          <RefreshCw
+            size={24}
+            className={cn(
+              "text-primary transition-all duration-700",
+              loading && "animate-spin"
             )}
-            <span className="text-[10px] font-black uppercase italic">
-              Sync Hub
-            </span>
-          </Button>
-          <Button className="h-16 px-10 bg-primary hover:bg-blue-600 text-white rounded-2xl shadow-2xl shadow-primary/20 transition-all">
-            <CloudDownload size={20} className="mr-3" />
-            <span className="text-[10px] font-black uppercase italic">
-              Export Global BI
-            </span>
-          </Button>
-        </div>
+          />
+        </Button>
       </div>
 
-      {/* KPI METRIC CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          {
-            label: "Synced Batches",
-            val: batches.length,
-            sub: "Verified",
-            icon: Layers,
-            color: "text-blue-400",
-          },
-          {
-            label: "Total Entities",
-            val: inventory.length.toLocaleString(),
-            sub: "Master Records",
-            icon: Database,
-            color: "text-emerald-400",
-          },
-          {
-            label: "Memory Usage",
-            val: "1.2 GB",
-            sub: "Cloud Buffer",
-            icon: Zap,
-            color: "text-amber-400",
-          },
-          {
-            label: "Security Status",
-            val: "Encrypted",
-            sub: "AES-256",
-            icon: ShieldCheck,
-            color: "text-primary",
-          },
-        ].map((stat, i) => (
-          <Card
-            key={i}
-            className="bg-[#0f172a] border-white/5 shadow-2xl rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all"
+      <Tabs defaultValue="vortex_data" className="w-full">
+        <TabsList className="bg-[#0f172a] border border-white/5 p-2 h-20 rounded-[2rem] mb-12 shadow-[0_30px_60px_rgba(0,0,0,0.5)]">
+          <TabsTrigger
+            value="vortex_data"
+            className="rounded-[1.5rem] px-14 h-full font-black uppercase text-xs italic data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
           >
-            <CardContent className="p-8 relative">
-              <div className="flex justify-between items-start">
-                <div className="space-y-4">
-                  <p className="text-[9px] font-black uppercase text-slate-500 tracking-[0.2em]">
-                    {stat.label}
-                  </p>
-                  <p
-                    className={cn(
-                      "text-3xl font-black italic tracking-tighter",
-                      stat.color
-                    )}
-                  >
-                    {stat.val}
-                  </p>
-                  <p className="text-[8px] font-bold text-slate-600 uppercase italic">
-                    Protocols: {stat.sub}
-                  </p>
-                </div>
-                <div className="p-3 bg-black/40 rounded-2xl border border-white/5 group-hover:scale-110 transition-transform">
-                  <stat.icon className={cn("w-5 h-5", stat.color)} />
-                </div>
+            <Database size={18} className="mr-3" /> Vortex Data Grid (Tab 1)
+          </TabsTrigger>
+          <TabsTrigger
+            value="batch_master"
+            className="rounded-[1.5rem] px-14 h-full font-black uppercase text-xs italic data-[state=active]:bg-primary data-[state=active]:text-white transition-all"
+          >
+            <Layers size={18} className="mr-3" /> Batch Master (Tab 2)
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: GABUNGAN SEMUA DATASET (ULTRA CLEAN TABLE) */}
+        <TabsContent
+          value="vortex_data"
+          className="animate-in slide-in-from-left-5 duration-500"
+        >
+          <Card className="bg-[#0f172a] border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
+            <div className="p-8 bg-white/5 border-b border-white/5 flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest italic">
+                Consolidated_Neural_Records
+              </span>
+              <div className="flex gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-bold text-emerald-500 uppercase italic">
+                  Integrity_Secure
+                </span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* MAIN TERMINAL INTERFACE */}
-      <Tabs
-        defaultValue="inventory"
-        className="w-full"
-        onValueChange={setActiveTab}
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 bg-[#0f172a]/50 p-4 rounded-[2.5rem] border border-white/5">
-          <TabsList className="bg-[#020617] border border-white/5 p-1.5 h-14 rounded-2xl w-full md:w-[450px]">
-            <TabsTrigger
-              value="inventory"
-              className="flex-1 rounded-xl data-[state=active]:bg-primary font-black uppercase italic text-[10px]"
-            >
-              <List size={14} className="mr-2" /> Global Inventory
-            </TabsTrigger>
-            <TabsTrigger
-              value="batches"
-              className="flex-1 rounded-xl data-[state=active]:bg-primary font-black uppercase italic text-[10px]"
-            >
-              <HardDrive size={14} className="mr-2" /> Batch Control
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="relative group w-full md:w-80 px-2">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 group-focus-within:text-primary transition-colors" />
-            <Input
-              placeholder="Search master data..."
-              className="h-12 bg-[#020617] border-white/5 rounded-xl pl-12 text-xs text-white"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <TabsContent value="inventory" className="outline-none">
-          <div className="bg-[#0f172a] rounded-[3rem] overflow-hidden border border-white/5 shadow-2xl">
+            </div>
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-primary scrollbar-track-transparent">
               <div className="min-w-[1500px]">
                 <Table>
-                  <TableHeader className="bg-[#020617]/80 sticky top-0 z-30 border-b border-white/5 backdrop-blur-xl">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="px-10 py-10 text-[10px] font-black uppercase text-slate-500 italic">
-                        Record_ID
+                  <TableHeader className="bg-[#020617]">
+                    <TableRow className="border-white/5 hover:bg-transparent">
+                      <TableHead className="px-10 py-8 text-[11px] font-black uppercase text-slate-500 italic">
+                        Identity_Node
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500 italic">
-                        Retailer
+                      <TableHead className="text-[11px] font-black uppercase text-slate-500 italic text-center">
+                        Geo_Cluster
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500 italic">
+                      <TableHead className="text-[11px] font-black uppercase text-slate-500 italic">
                         Entity_Class
                       </TableHead>
-                      <TableHead className="text-[10px] font-black uppercase text-slate-500 italic">
-                        Geo_Node
-                      </TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 italic">
-                        Units
-                      </TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase text-slate-500 italic px-10 text-emerald-400">
-                        Net_Sales
+                      <TableHead className="text-right text-[11px] font-black uppercase text-slate-500 italic px-10">
+                        Neural_Value
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventory.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="h-60 text-center text-slate-700 font-black italic uppercase tracking-widest"
-                        >
-                          Awaiting master node ingestion...
+                    {inventory.map((row, i) => (
+                      <TableRow
+                        key={i}
+                        className="border-white/5 hover:bg-white/[0.03] transition-all group duration-500"
+                      >
+                        <TableCell className="px-10 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-[#020617] rounded-2xl flex items-center justify-center text-[10px] font-black text-primary border border-white/5 group-hover:bg-primary group-hover:text-white transition-all shadow-inner uppercase">
+                              {row.retailer?.retailer_name.charAt(0)}
+                            </div>
+                            <span className="text-base font-black italic text-white uppercase tracking-tighter">
+                              {row.retailer?.retailer_name}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="px-4 py-1.5 bg-black/40 text-slate-400 text-[10px] font-black uppercase italic rounded-full border border-white/5">
+                            {row.city?.city}, {row.city?.state?.region}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-primary font-black italic text-xs uppercase">
+                          {row.product?.product}
+                        </TableCell>
+                        <TableCell className="text-right px-10 font-mono text-emerald-400 font-black text-2xl italic group-hover:scale-110 transition-transform">
+                          ${row.total_sales.toLocaleString()}
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      filteredInventory.map((item, i) => (
-                        <TableRow
-                          key={i}
-                          className="border-white/5 hover:bg-white/[0.02] group transition-colors"
-                        >
-                          <TableCell className="px-10 py-6 text-[10px] font-mono text-slate-600">
-                            ADI_VX_{item.id_upload}_{i}
-                          </TableCell>
-                          <TableCell className="text-[11px] font-bold text-slate-300 uppercase">
-                            {item.retailer?.retailer_name}
-                          </TableCell>
-                          <TableCell>
-                            <span className="px-3 py-1 bg-[#020617] text-white text-[9px] font-black uppercase italic rounded-full border border-white/5">
-                              {item.product?.product}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-500 uppercase italic">
-                            {item.city?.city}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-blue-400 text-xs font-black">
-                            {item.unit_sold?.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-emerald-400 font-black text-xs px-10">
-                            ${item.total_sales?.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
               </div>
             </div>
-          </div>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="batches" className="outline-none space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {batches.map((batch) => (
+        {/* TAB 2: DATASET PER BATCH (FULL CRUD PROTOCOL) */}
+        <TabsContent
+          value="batch_master"
+          className="animate-in slide-in-from-right-5 duration-500"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {batches.map((b, i) => (
               <Card
-                key={batch.id_upload}
-                className="bg-[#0f172a] border-white/5 shadow-2xl rounded-[3rem] overflow-hidden group hover:border-primary/40 transition-all"
+                key={i}
+                className="bg-[#0f172a] border-white/5 rounded-[2.5rem] p-8 hover:border-primary/40 transition-all group shadow-[0_30px_60px_rgba(0,0,0,0.5)] relative overflow-hidden"
               >
-                <CardHeader className="p-8 pb-4 flex flex-row items-center justify-between">
-                  <div className="p-4 bg-primary/10 rounded-2xl text-primary border border-primary/20">
-                    <FileText size={24} />
+                <div className="flex justify-between items-start mb-8 relative z-10">
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/5 group-hover:bg-primary/10 transition-colors shadow-inner">
+                    <FileText size={24} className="text-primary" />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handlePurgeBatch(batch.id_upload)}
-                    className="text-rose-500 hover:bg-rose-500/10 rounded-full transition-colors"
+                  <div
+                    className={cn(
+                      "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-xl",
+                      b.status === "APPROVED"
+                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                        : b.status === "REJECTED"
+                        ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                    )}
                   >
-                    <Trash2 size={20} />
-                  </Button>
-                </CardHeader>
-                <CardContent className="p-8 pt-0 space-y-8">
-                  <div>
-                    <h3 className="text-xl font-black text-white uppercase italic truncate tracking-tighter leading-none group-hover:text-primary transition-colors">
-                      {batch.file_name}
-                    </h3>
-                    <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-3">
-                      SYS_ID: {batch.system_name}
+                    {b.status}
+                  </div>
+                </div>
+                <div className="space-y-6 mb-12 relative z-10">
+                  <h3 className="text-2xl font-black italic text-white uppercase truncate leading-none">
+                    {b.file_name}
+                  </h3>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3 text-slate-500 font-bold uppercase text-[10px] italic leading-none">
+                      <User size={14} className="text-primary" />{" "}
+                      <span>{b.uploaded_by}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-slate-500 font-bold uppercase text-[10px] italic leading-none">
+                      <Calendar size={14} className="text-primary" />{" "}
+                      <span>{new Date(b.upload_date).toLocaleString()}</span>
+                    </div>
+                  </div>
+                  {/* Communication Display */}
+                  <div className="p-5 bg-black/60 rounded-[1.5rem] border border-white/5 shadow-inner">
+                    <p className="text-[9px] text-slate-500 font-black uppercase mb-2 flex items-center gap-2 tracking-widest">
+                      <MessageCircle size={10} className="text-primary" />{" "}
+                      Intelligence_Note:
+                    </p>
+                    <p className="text-[11px] text-slate-300 italic font-medium leading-relaxed">
+                      "{b.note || "System generated protocol."}"
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-6 pt-6 border-t border-white/5">
-                    <div className="space-y-1">
-                      <p className="text-[8px] font-black uppercase text-slate-700">
-                        Rows Ingested
-                      </p>
-                      <p className="text-sm font-mono text-slate-200 font-black">
-                        {batch.total_rows?.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="space-y-1 text-right">
-                      <p className="text-[8px] font-black uppercase text-slate-700">
-                        Deploy Date
-                      </p>
-                      <p className="text-[10px] font-bold text-slate-400">
-                        {new Date(batch.upload_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
+                </div>
+                <div className="flex gap-4 pt-6 border-t border-white/5 relative z-10">
                   <Button
                     variant="ghost"
-                    className="w-full bg-white/5 h-12 rounded-2xl text-[9px] font-black uppercase italic text-slate-400 hover:text-white group-hover:bg-primary transition-all"
+                    className="flex-1 bg-white/5 hover:bg-primary h-14 text-[10px] font-black uppercase rounded-2xl transition-all shadow-xl"
                   >
-                    <Eye size={14} className="mr-2" /> Audit Dataset Stream
+                    <Eye size={18} className="mr-2" /> Inspect
                   </Button>
-                </CardContent>
+                  <Button
+                    variant="ghost"
+                    className="w-14 h-14 bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white border border-rose-600/10 rounded-2xl transition-all shadow-xl group"
+                  >
+                    <Trash2
+                      size={20}
+                      className="group-hover:rotate-12 transition-transform"
+                    />
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>

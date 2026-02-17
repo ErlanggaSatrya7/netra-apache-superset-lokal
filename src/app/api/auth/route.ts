@@ -1,13 +1,27 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
+    const body = await req.json();
+    const { action, email, password } = body;
+    const cookieStore = await cookies();
 
-    // HANDSHAKE: Perhatikan panggilannya 'users' (sesuai schema.prisma kamu)
+    // LOGOUT
+    if (action === "logout") {
+      cookieStore.set("vortex_session", "", {
+        expires: new Date(0),
+        path: "/",
+      });
+      cookieStore.set("user_role", "", { expires: new Date(0), path: "/" });
+      return NextResponse.json({ success: true });
+    }
+
+    // LOGIN
+    // Gunakan email.trim().toLowerCase() agar tidak typo karena huruf besar
     const user = await prisma.users.findUnique({
-      where: { email: email.trim() },
+      where: { email: email.trim().toLowerCase() },
     });
 
     if (!user || user.password !== password) {
@@ -19,19 +33,18 @@ export async function POST(req: Request) {
 
     const rolePath = user.role?.toUpperCase() === "ADMIN" ? "/admin" : "/staff";
 
-    const response = NextResponse.json({
-      success: true,
-      user: { id: user.id, role: user.role },
-      redirect: rolePath,
-    });
-
-    response.cookies.set("vortex_session", "active", { path: "/" });
-    response.cookies.set("user_role", user.role?.toLowerCase() || "staff", {
+    // Set Cookies
+    cookieStore.set("vortex_session", "active", { path: "/" });
+    cookieStore.set("user_role", user.role?.toLowerCase() || "staff", {
       path: "/",
     });
 
-    return response;
+    return NextResponse.json({
+      success: true,
+      redirect: rolePath,
+    });
   } catch (error: any) {
-    return NextResponse.json({ error: "DATABASE_OFFLINE" }, { status: 500 });
+    console.error("AUTH_ERROR:", error);
+    return NextResponse.json({ error: "DATABASE_TIMEOUT" }, { status: 500 });
   }
 }

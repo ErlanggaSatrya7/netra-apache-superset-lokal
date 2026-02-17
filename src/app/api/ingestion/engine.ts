@@ -6,27 +6,26 @@ export async function POST(req: Request) {
   try {
     const { fileName, rawData, userEmail, staffComment } = await req.json();
 
-    // PHASE 1: NEURAL CLEANING (PYTHON SPEED)
-    // vortexCleaningEngine (lib/cleaning-pipeline.ts) memproses ribuan data di RAM bukan di I/O DB.
-    const cleanNodes = vortexCleaningEngine(rawData);
+    // 1. NEURAL CLEANING PHASE (PYTHON SPEED)
+    // vortexCleaningEngine akan bantai duplikat, null, dan format aneh dalam hitungan ms.
+    const cleanedNodes = vortexCleaningEngine(rawData);
 
-    // PHASE 2: MASSIVE BATCH HANDSHAKE
+    // 2. ATOMIC BATCH INGESTION
     const result = await prisma.$transaction(
       async (tx) => {
-        // 1. Create Header with Traceability
-        const history = await tx.upload_history.create({
+        const batch = await tx.upload_history.create({
           data: {
             file_name: fileName,
-            system_name: `ADI-TITAN-${Date.now()}`,
+            system_name: `TITAN-${Date.now()}`,
             status: "PENDING",
-            total_rows: cleanNodes.length,
+            total_rows: cleanedNodes.length,
             uploaded_by: userEmail,
-            note: staffComment || "Auto-sanitized batch.",
+            note: staffComment,
           },
         });
 
-        // 2. High-Speed Relational Upsert
-        for (const node of cleanNodes) {
+        // Proses looping master data (Upserting)
+        for (const node of cleanedNodes) {
           const stateNode = await tx.state.upsert({
             where: { state: node.state },
             update: {},
@@ -39,31 +38,31 @@ export async function POST(req: Request) {
             create: { city: node.city, id_state: stateNode.id_state },
           });
 
-          // Final Transaction Insertion
+          const retailerNode = await tx.retailer.upsert({
+            where: { retailer_name: node.retailer },
+            update: {},
+            create: { retailer_name: node.retailer },
+          });
+
+          const productNode = await tx.product.upsert({
+            where: { product: node.product },
+            update: {},
+            create: { product: node.product },
+          });
+
+          const methodNode = await tx.method.upsert({
+            where: { method: node.salesMethod },
+            update: {},
+            create: { method: node.salesMethod },
+          });
+
+          // Simpan Transaksi (Holding Stage)
           await tx.transaction.create({
             data: {
-              id_upload: history.id_upload,
-              id_retailer: (
-                await tx.retailer.upsert({
-                  where: { retailer_name: node.retailer },
-                  update: {},
-                  create: { retailer_name: node.retailer },
-                })
-              ).id_retailer,
-              id_product: (
-                await tx.product.upsert({
-                  where: { product: node.product },
-                  update: {},
-                  create: { product: node.product },
-                })
-              ).id_product,
-              id_method: (
-                await tx.method.upsert({
-                  where: { method: node.salesMethod },
-                  update: {},
-                  create: { method: node.salesMethod },
-                })
-              ).id_method,
+              id_upload: batch.id_upload,
+              id_retailer: retailerNode.id_retailer,
+              id_product: productNode.id_product,
+              id_method: methodNode.id_method,
               id_city: cityNode.id_city,
               unit_sold: node.unitsSold,
               total_sales: node.totalSales,
@@ -71,11 +70,10 @@ export async function POST(req: Request) {
               operating_margin: node.operatingMargin,
               price_per_unit: node.pricePerUnit,
               invoice_date: node.invoiceDate,
-              is_approved: false,
             },
           });
         }
-        return history;
+        return batch;
       },
       { timeout: 600000 }
     );

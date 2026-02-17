@@ -7,30 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 1. MASTER USER
 model users {
   id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email    String? @unique
   password String?
-  role     String? @default("STAFF") // ADMIN atau STAFF
+  role     String? @default("STAFF")
 }
 
-// 2. RIWAYAT UPLOAD (Induk Dataset)
 model upload_history {
-  id_upload    Int           @id @default(autoincrement())
-  file_name    String        @db.VarChar // Nama asli: data_sales.xlsx
-  system_name  String        @unique @db.VarChar // Nama sistem: adidas_v1
-  status       String        @default("PENDING") // PENDING, APPROVED, REJECTED
-  note         String?       @db.Text    // Alasan reject dari admin
-  total_rows   Int           @default(0)
-  uploaded_by  String?       @db.VarChar // Email staff yang upload
-  upload_date  DateTime?     @default(now()) @db.Timestamp(6)
-  
-  // Relasi: Jika history dihapus, semua transaksi di dalamnya OTOMATIS terhapus (Cascade)
-  transactions transaction[]
+  id_upload      Int           @id @default(autoincrement())
+  file_name      String        @db.VarChar 
+  system_name    String        @unique @db.VarChar 
+  status         String        @default("PENDING") 
+  staff_comment  String?       @db.Text
+  admin_response String?       @db.Text
+  total_rows     Int           @default(0)
+  uploaded_by    String?       @db.VarChar 
+  upload_date    DateTime?     @default(now()) @db.Timestamp(6)
+  transactions   transaction[]
 }
 
-// 3. MASTER DATA (State, City, Product, Retailer, Method)
 model state {
   id_state Int    @id @default(autoincrement())
   state    String @unique @db.VarChar
@@ -46,12 +42,6 @@ model city {
   transaction transaction[]
 }
 
-model method {
-  id_method   Int           @id @default(autoincrement())
-  method      String        @unique @db.VarChar
-  transaction transaction[]
-}
-
 model product {
   id_product  Int           @id @default(autoincrement())
   product     String        @unique @db.VarChar
@@ -60,97 +50,38 @@ model product {
 
 model retailer {
   id_retailer   Int           @id @default(autoincrement())
+  retailer_id   String?       @db.VarChar // Adidas Retailer ID (Kolom 2)
   retailer_name String        @unique @db.VarChar
   transaction   transaction[]
 }
 
-// 4. TRANSAKSI (Data Inti)
+model method {
+  id_method   Int           @id @default(autoincrement())
+  method      String        @unique @db.VarChar
+  transaction transaction[]
+}
+
 model transaction {
   id_transaction   Int       @id @default(autoincrement())
   id_retailer      Int
   id_product       Int
   id_method        Int
   id_city          Int
-  id_upload        Int?      // Link ke Dataset (upload_history)
-  invoice_date     DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
-  price_per_unit   Decimal?  @db.Decimal
-  unit_sold        Int?
-  total_sales      Decimal?  @db.Decimal
-  operating_profit Decimal?  @db.Decimal
-  operating_margin Decimal?  @db.Decimal
-  is_approved      Boolean?  @default(false) // Flag validasi admin
+  id_upload        Int?      
+  invoice_date     DateTime? @db.Date
+  
+  // SEMUA 13 KOLOM ADIDAS READY
+  price_per_unit   Decimal?  @db.Decimal // Kolom 9
+  unit_sold        Int?                  // Kolom 10
+  total_sales      Decimal?  @db.Decimal // Kolom 11
+  operating_profit Decimal?  @db.Decimal // Kolom 12
+  operating_margin Decimal?  @db.Decimal // Kolom 13
 
-  // Relasi
+  is_approved      Boolean?  @default(false)
+
   upload_history   upload_history? @relation(fields: [id_upload], references: [id_upload], onDelete: Cascade)
   city             city            @relation(fields: [id_city], references: [id_city], onDelete: NoAction)
   method           method          @relation(fields: [id_method], references: [id_method], onDelete: NoAction)
   product          product         @relation(fields: [id_product], references: [id_product], onDelete: NoAction)
   retailer         retailer        @relation(fields: [id_retailer], references: [id_retailer], onDelete: NoAction)
 }
-
-// model city {
-//   id_city     Int           @id @default(autoincrement())
-//   city        String        @unique(map: "city_unique_name") @db.VarChar
-//   id_state    Int
-//   state       state         @relation(fields: [id_state], references: [id_state], onDelete: Cascade, onUpdate: NoAction, map: "fk_city_state")
-//   transaction transaction[]
-// }
-
-// model method {
-//   id_method   Int           @id @default(autoincrement())
-//   method      String        @unique(map: "method_unique_name") @db.VarChar
-//   transaction transaction[]
-// }
-
-// model product {
-//   id_product  Int           @id @default(autoincrement())
-//   product     String        @unique(map: "product_unique_name") @db.VarChar
-//   transaction transaction[]
-// }
-
-// model retailer {
-//   id_retailer   Int           @id @default(autoincrement())
-//   retailer_name String        @unique(map: "retailer_unique_name") @db.VarChar
-//   transaction   transaction[]
-// }
-
-// model state {
-//   id_state Int    @id @default(autoincrement())
-//   state    String @unique @db.VarChar // TAMBAHKAN @unique DI SINI
-//   city     city[]
-// }
-
-// /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-// model transaction {
-//   id_transaction   Int       @id @default(autoincrement())
-//   id_retailer      Int
-//   id_product       Int
-//   id_method        Int
-//   id_city          Int
-//   invoice_date     DateTime? @default(dbgenerated("CURRENT_DATE")) @db.Date
-//   price_per_unit   Decimal?  @db.Decimal
-//   unit_sold        Int?
-//   total_sales      Decimal?  @db.Decimal
-//   operating_profit Decimal?  @db.Decimal
-//   operating_margin Decimal?  @db.Decimal
-//   is_approved      Boolean?  @default(false)
-//   city             city      @relation(fields: [id_city], references: [id_city], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_city")
-//   method           method    @relation(fields: [id_method], references: [id_method], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_method")
-//   product          product   @relation(fields: [id_product], references: [id_product], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_product")
-//   retailer         retailer  @relation(fields: [id_retailer], references: [id_retailer], onDelete: NoAction, onUpdate: NoAction, map: "fk_transaction_retailer")
-// }
-
-// model users {
-//   id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-//   email    String? @unique
-//   password String?
-// }
-
-// model upload_history {
-//   id_upload   Int       @id @default(autoincrement())
-//   file_name   String    @db.VarChar
-//   system_name String    @db.VarChar
-//   total_rows  Int
-//   upload_date DateTime? @default(now()) @db.Timestamp(6)
-//   status      String?   @default("MENUNGGU ADMIN (PENDING)") @db.VarChar
-// }
