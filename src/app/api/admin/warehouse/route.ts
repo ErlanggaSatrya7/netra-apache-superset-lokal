@@ -1,61 +1,50 @@
-import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export async function GET(req: Request) {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const mode = searchParams.get("mode"); // "raw" atau "datasets"
+  const status = searchParams.get("status") || "APPROVED";
+
   try {
-    const { searchParams } = new URL(req.url);
-    const mode = searchParams.get("mode");
-    const datasetId = searchParams.get("datasetId");
-
-    // 1. DATASET DETAIL (WAREHOUSE [ID])
-    if (datasetId) {
+    if (mode === "raw") {
+      // BANTAI: Ambil SEMUA baris transaksi dari SEMUA dataset yang sudah APPROVED
       const transactions = await prisma.transaction.findMany({
-        where: { id_upload: Number(datasetId) },
+        where: {
+          upload_history: {
+            status: status, // Hanya yang sudah di-approve admin
+          },
+        },
         include: {
+          upload_history: true, // WAJIB: Supaya frontend bisa filter status
           retailer: true,
           product: true,
-          method: true,
           city: { include: { state: true } },
+          method: true,
         },
-        orderBy: { id_transaction: "asc" },
+        orderBy: { invoice_date: "desc" },
       });
-      return NextResponse.json(transactions || []);
+      return NextResponse.json(transactions);
     }
 
-    // 2. TAB 2: DATASET ARCHIVE
     if (mode === "datasets") {
+      // Ambil ringkasan dataset (Batch Upload)
       const datasets = await prisma.upload_history.findMany({
-        where: { status: "APPROVED" },
-        include: { _count: { select: { transactions: true } } },
+        where: { status: status },
+        include: {
+          _count: { select: { transactions: true } },
+        },
         orderBy: { upload_date: "desc" },
       });
-      return NextResponse.json(datasets || []);
+      return NextResponse.json(datasets);
     }
 
-    // 3. TAB 1: GLOBAL ROWS
-    const transactions = await prisma.transaction.findMany({
-      include: {
-        retailer: true,
-        product: true,
-        method: true,
-        city: { include: { state: true } },
-      },
-      orderBy: { id_transaction: "desc" },
-      take: 100,
-    });
-    return NextResponse.json(transactions || []);
-  } catch (e: any) {
-    return NextResponse.json([], { status: 500 });
-  }
-}
-
-export async function DELETE(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const id = searchParams.get("id");
-    await prisma.upload_history.delete({ where: { id_upload: Number(id) } });
-    return NextResponse.json({ success: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return NextResponse.json({ error: "INVALID_MODE" }, { status: 400 });
+  } catch (error) {
+    console.error("WAREHOUSE_FETCH_CRITICAL_ERROR:", error);
+    return NextResponse.json(
+      { error: "DATABASE_CONNECTION_FAILED" },
+      { status: 500 }
+    );
   }
 }
