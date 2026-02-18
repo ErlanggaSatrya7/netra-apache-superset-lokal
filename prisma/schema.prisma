@@ -14,17 +14,20 @@ model users {
   role     String? @default("STAFF")
 }
 
+
 model upload_history {
   id_upload      Int           @id @default(autoincrement())
-  file_name      String        @db.VarChar 
-  system_name    String        @unique @db.VarChar 
-  status         String        @default("PENDING") 
-  staff_comment  String?       @db.Text
+  file_name      String        @db.VarChar
+  system_name    String        @unique @db.VarChar
+  status         String        @default("PENDING")
+  staff_comment  String?       @db.Text   // Ini penampung pesan staff
   admin_response String?       @db.Text
   total_rows     Int           @default(0)
-  uploaded_by    String?       @db.VarChar 
+  uploaded_by    String?       @db.VarChar
   upload_date    DateTime?     @default(now()) @db.Timestamp(6)
   transactions   transaction[]
+
+  @@index([status])
 }
 
 model state {
@@ -50,7 +53,7 @@ model product {
 
 model retailer {
   id_retailer   Int           @id @default(autoincrement())
-  retailer_id   String?       @db.VarChar // Adidas Retailer ID (Kolom 2)
+  retailer_id   String?       @db.VarChar
   retailer_name String        @unique @db.VarChar
   transaction   transaction[]
 }
@@ -61,27 +64,32 @@ model method {
   transaction transaction[]
 }
 
+// ... datasource & generator tetap sama
+
 model transaction {
   id_transaction   Int       @id @default(autoincrement())
   id_retailer      Int
   id_product       Int
   id_method        Int
   id_city          Int
-  id_upload        Int?      
+  id_upload        Int?
   invoice_date     DateTime? @db.Date
-  
-  // SEMUA 13 KOLOM ADIDAS READY
-  price_per_unit   Decimal?  @db.Decimal // Kolom 9
-  unit_sold        Int?                  // Kolom 10
-  total_sales      Decimal?  @db.Decimal // Kolom 11
-  operating_profit Decimal?  @db.Decimal // Kolom 12
-  operating_margin Decimal?  @db.Decimal // Kolom 13
+  price_per_unit   Decimal?  @db.Decimal(18, 2)
+  unit_sold        Int?
+  total_sales      Decimal?  @db.Decimal(18, 2)
+  operating_profit Decimal?  @db.Decimal(18, 2)
+  operating_margin Decimal?  @db.Decimal(18, 4)
 
+  // Status Utama untuk Analytics
   is_approved      Boolean?  @default(false)
+  record_status    String    @default("PENDING") // PENDING, STABLE, REJECTED
 
   upload_history   upload_history? @relation(fields: [id_upload], references: [id_upload], onDelete: Cascade)
   city             city            @relation(fields: [id_city], references: [id_city], onDelete: NoAction)
   method           method          @relation(fields: [id_method], references: [id_method], onDelete: NoAction)
   product          product         @relation(fields: [id_product], references: [id_product], onDelete: NoAction)
   retailer         retailer        @relation(fields: [id_retailer], references: [id_retailer], onDelete: NoAction)
+
+  @@index([id_upload])
+  @@index([is_approved, record_status]) // Index komposit untuk Dashboard Admin
 }

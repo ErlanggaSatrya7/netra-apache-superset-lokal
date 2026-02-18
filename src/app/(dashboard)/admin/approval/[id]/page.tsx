@@ -1,249 +1,380 @@
 "use client";
 
-import React, { useEffect, useState, use } from "react";
+import React, { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import {
+  ShieldCheck,
   ArrowLeft,
-  CheckCircle2,
   XCircle,
-  Table as TableIcon,
+  Database,
   Loader2,
+  Radio,
+  AlertTriangle,
   Zap,
   MessageSquare,
+  Send,
+  User,
+  Hash,
+  Activity,
+  Maximize2,
+  X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/**
- * TITAN DEEP AUDIT TERMINAL v32.6
- * Feature: 13-Column Dataset with Risk Detection (Conditional Coloring)
- */
-export default function DeepAuditInspection({
+export default function AdminApprovalDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = use(params);
   const router = useRouter();
-  const [data, setData] = useState<any>(null);
+  const { id } = use(params);
+  const [batch, setBatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [adminMessage, setAdminMessage] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [adminReply, setAdminReply] = useState("");
+  const [showFullAudit, setShowFullAudit] = useState(false);
+
+  const fetchDetail = async (isInitial = false) => {
+    try {
+      // Force fresh data dengan timestamp
+      const res = await fetch(`/api/admin/approval/${id}?t=${Date.now()}`);
+      const result = await res.json();
+      if (res.ok) {
+        setBatch(result);
+        if (isInitial && result.admin_response)
+          setAdminReply(result.admin_response);
+      }
+    } catch (err) {
+      toast.error("VAULT_SYNC_FAILED");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetch(`/api/shared/neural-sync?id_upload=${id}`)
-      .then((res) => res.json())
-      .then((res) => {
-        setData(res);
-        setLoading(false);
-      });
+    fetchDetail(true);
   }, [id]);
 
-  const executeDecision = async (status: "APPROVED" | "REJECTED") => {
-    setIsProcessing(true);
-    const loader = toast.loading(`Committing_${status}_Protocol...`);
+  const handleAction = async (status: "APPROVED" | "REJECTED") => {
+    if (status === "REJECTED" && !adminReply.trim())
+      return toast.error("REQUIRED: Alasan penolakan wajib diisi!");
+
+    setProcessing(true);
+    const toastId = toast.loading(`Executing_${status}_Protocol...`);
     try {
-      const res = await fetch("/api/admin/decision", {
-        method: "POST",
-        body: JSON.stringify({ batchId: id, decision: status, adminMessage }),
+      const res = await fetch(`/api/admin/approval`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_upload: Number(id),
+          status: status,
+          admin_comment: adminReply, // Memastikan comment terkirim
+        }),
       });
-      if (res.ok) {
-        toast.success(`Batch_Security_Status:_${status}`, { id: loader });
-        window.location.href = "/admin/approval";
-      }
-    } catch (e) {
-      toast.error("HANDSHAKE_FAILURE");
+
+      if (!res.ok) throw new Error();
+
+      toast.success(`SYSTEM_SYNCHRONIZED: ${status}`, { id: toastId });
+      setTimeout(() => {
+        router.push("/admin/approval");
+        router.refresh();
+      }, 1200);
+    } catch (err) {
+      toast.error("PROTOCOL_FAILURE", { id: toastId });
     } finally {
-      setIsProcessing(false);
+      setProcessing(false);
     }
+  };
+
+  const formatIDR = (val: any) => {
+    const num = Number(val);
+    return isNaN(num) ? "0" : num.toLocaleString("id-ID");
   };
 
   if (loading)
     return (
-      <div className="h-screen flex flex-col items-center justify-center space-y-6 bg-[#020617]">
-        <Loader2 className="w-16 h-16 text-primary animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[1em] text-slate-500 animate-pulse italic">
-          Decrypting_Batch_{id}...
-        </p>
+      <div className="h-screen bg-[#020617] flex flex-col items-center justify-center text-primary gap-4">
+        <Loader2 className="animate-spin" size={48} />
+        <span className="font-black tracking-[0.5em] text-[10px] uppercase animate-pulse">
+          Decrypting_Payload...
+        </span>
       </div>
     );
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-40">
-      {/* AUDIT HEADER */}
-      <div className="flex items-center gap-6 border-b border-white/5 pb-8">
-        <Button
-          variant="outline"
-          onClick={() => router.back()}
-          className="rounded-2xl w-14 h-14 bg-white/5 border-white/5 hover:bg-primary transition-all"
-        >
-          <ArrowLeft size={20} />
-        </Button>
-        <div>
-          <h1 className="text-4xl font-black italic uppercase text-white tracking-tighter leading-none">
-            Stream{" "}
-            <span className="text-primary font-sans lowercase">Audit</span>
-          </h1>
-          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-[0.4em] mt-1">
-            Inspection_Node_Verified
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#020617] text-slate-300 font-sans pt-24 lg:pt-10 p-4 lg:p-10 italic text-left leading-none selection:bg-primary/30">
+      {/* STYLE: THICK YELLOW SCROLLBAR */}
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 14px;
+          height: 14px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.02);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          border: 3px solid #020617;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #facc15;
+        }
+      `}</style>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
-        {/* DATA GRID SECTION */}
-        <div className="xl:col-span-9">
-          <Card className="bg-[#0f172a]/60 border border-white/5 rounded-[3rem] overflow-hidden shadow-2xl">
-            <div className="p-8 bg-black/20 flex items-center justify-between border-b border-white/5">
-              <div className="flex items-center gap-3">
-                <TableIcon className="text-primary" size={18} />
-                <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
-                  Full_Matrix_13_Columns
-                </span>
+      <div className="max-w-[1800px] mx-auto space-y-12">
+        {/* HEADER BAR */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 border-b border-white/10 pb-12 leading-none">
+          <div className="flex items-center gap-8 leading-none">
+            <button
+              onClick={() => router.back()}
+              className="p-5 bg-white/5 border border-white/10 rounded-2xl hover:bg-primary hover:text-black transition-all active:scale-90 border-none outline-none shadow-2xl"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <div className="space-y-3 leading-none">
+              <h1 className="text-5xl lg:text-7xl font-black italic text-white uppercase tracking-tighter leading-none">
+                Audit_<span className="text-primary">Console</span>
+              </h1>
+              <div className="flex items-center gap-4 text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none">
+                <Hash size={12} className="text-primary" /> TX_ID: #TX-{id}{" "}
+                <div className="w-1 h-1 bg-slate-800 rounded-full" />{" "}
+                <Activity size={12} className="text-primary" /> STATUS:{" "}
+                {batch?.status}
               </div>
-              <span className="text-[10px] font-black text-primary bg-primary/10 px-4 py-1 rounded-full border border-primary/20 italic">
-                Source: {data?.file_name}
-              </span>
             </div>
-
-            <div className="overflow-auto max-h-[700px] scrollbar-thin scrollbar-thumb-primary">
-              <Table>
-                <TableHeader className="bg-[#020617] sticky top-0 z-20 h-16">
-                  <TableRow className="border-white/5 uppercase italic font-black text-[9px] text-slate-500">
-                    <TableHead className="px-8">Retailer</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Product_Entity</TableHead>
-                    <TableHead className="text-emerald-500 text-right">
-                      Gross_Sales
-                    </TableHead>
-                    <TableHead className="text-right">Op_Profit</TableHead>
-                    <TableHead className="text-center">Margin</TableHead>
-                    <TableHead className="text-center">Method</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data?.transactions?.map((row: any, i: number) => {
-                    // INISIATIF: PANDANGAN ANOMALI (Profit < 1 Juta Rupiah)
-                    const isRisk = Number(row.operating_profit) < 1000000;
-                    return (
-                      <TableRow
-                        key={i}
-                        className={cn(
-                          "border-white/5 transition-all h-20",
-                          isRisk
-                            ? "bg-rose-500/[0.04] hover:bg-rose-500/[0.08]"
-                            : "hover:bg-white/[0.02]"
-                        )}
-                      >
-                        <TableCell className="px-8">
-                          <p className="font-black text-white text-xs uppercase">
-                            {row.retailer?.retailer_name}
-                          </p>
-                          <p className="text-[9px] font-mono text-slate-600">
-                            ID: {row.retailer?.retailer_id}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-white font-bold text-[11px]">
-                            {row.city?.city}
-                          </p>
-                          <p className="text-[9px] text-slate-600">
-                            {row.city?.state?.region}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <span className="px-3 py-1 bg-black/40 rounded-full border border-white/5 text-slate-400 font-bold uppercase text-[9px]">
-                            {row.product?.product}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-emerald-400 font-black italic tracking-tighter text-right text-sm">
-                          ${Number(row.total_sales).toLocaleString()}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-right font-mono font-bold",
-                            isRisk ? "text-rose-500" : "text-blue-400"
-                          )}
-                        >
-                          ${Number(row.operating_profit).toLocaleString()}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-center font-bold",
-                            isRisk ? "text-rose-500" : "text-amber-500"
-                          )}
-                        >
-                          {(Number(row.operating_margin) * 100).toFixed(0)}%
-                        </TableCell>
-                        <TableCell className="text-center italic uppercase text-[8px] tracking-widest text-slate-500">
-                          {row.method?.method}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+          </div>
+          <button
+            onClick={() => setShowFullAudit(true)}
+            className="flex items-center gap-4 bg-white/5 text-primary px-8 py-5 rounded-[2rem] font-black uppercase text-[11px] tracking-widest hover:bg-primary hover:text-black transition-all border border-white/10 outline-none leading-none shadow-2xl"
+          >
+            <Maximize2 size={18} /> Deep_Audit_Mode
+          </button>
         </div>
 
-        {/* DECISION HUD */}
-        <div className="xl:col-span-3">
-          <Card className="bg-[#0f172a]/90 border border-white/5 rounded-[3rem] p-8 shadow-2xl sticky top-32 overflow-hidden">
-            <div className="absolute top-0 right-0 p-6 opacity-[0.03] rotate-12">
-              <Zap size={120} />
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 items-start leading-none text-left">
+          {/* LEFT: DATA TABLE PREVIEW */}
+          <div className="xl:col-span-8 space-y-8 leading-none">
+            <div className="bg-amber-500/10 border border-amber-500/20 p-8 rounded-[3rem] flex items-center gap-6 leading-none">
+              <AlertTriangle className="text-amber-500 shrink-0" size={32} />
+              <p className="text-[11px] font-black uppercase text-amber-200/70 tracking-widest leading-relaxed">
+                Review 13-node manifest carefully. Approval will sync data to
+                Global Warehouse.
+              </p>
             </div>
-            <h3 className="text-xl font-black italic text-white uppercase tracking-widest mb-6 leading-tight relative z-10">
-              Decision Hub
-            </h3>
 
-            <div className="space-y-6 relative z-10">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={14} className="text-primary" />
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                    Audit_Log
-                  </span>
+            <div className="bg-[#0b1120]/60 border border-white/10 rounded-[3.5rem] overflow-hidden shadow-2xl backdrop-blur-md leading-none">
+              <div className="p-8 border-b border-white/5 bg-white/[0.02] flex justify-between items-center leading-none">
+                <h2 className="flex items-center gap-4 text-white font-black uppercase tracking-widest text-xs italic leading-none">
+                  <Database size={18} className="text-primary" /> Manifest:{" "}
+                  {batch?.file_name}
+                </h2>
+                <div className="px-5 py-2 bg-primary/10 text-primary text-[10px] font-black rounded-full border border-primary/20 leading-none">
+                  {batch?.transactions?.length} NODES
                 </div>
-                <textarea
-                  value={adminMessage}
-                  onChange={(e) => setAdminMessage(e.target.value)}
-                  placeholder="State reason for authorization or denial..."
-                  className="w-full h-48 bg-black/40 border border-white/5 rounded-2xl p-6 text-xs text-slate-300 outline-none focus:ring-1 ring-primary/40 transition-all resize-none font-medium"
-                />
               </div>
-
-              <div className="flex flex-col gap-4">
-                <Button
-                  onClick={() => executeDecision("APPROVED")}
-                  disabled={isProcessing}
-                  className="h-20 bg-primary hover:bg-blue-600 text-white rounded-[1.5rem] font-black uppercase italic text-xs shadow-xl transition-all hover:scale-[1.02]"
-                >
-                  <CheckCircle2 size={18} className="mr-3" /> Authorize_Batch
-                </Button>
-                <Button
-                  onClick={() => executeDecision("REJECTED")}
-                  disabled={isProcessing}
-                  variant="ghost"
-                  className="h-16 bg-rose-600/5 hover:bg-rose-600 text-rose-500 hover:text-white rounded-[1.5rem] font-black uppercase italic text-xs transition-all border border-rose-600/20"
-                >
-                  <XCircle size={18} className="mr-3" /> Deny_Inbound
-                </Button>
+              <div className="max-h-[600px] overflow-auto custom-scrollbar leading-none">
+                <table className="w-full text-[9px] text-left border-separate border-spacing-0 min-w-[1200px] leading-none">
+                  <thead className="sticky top-0 z-20 bg-[#0b1120]">
+                    <tr className="text-slate-500 font-black uppercase italic tracking-widest h-16 bg-white/5 leading-none">
+                      <th className="px-8 border-b border-white/10">Date</th>
+                      <th className="px-8 border-b border-white/10">
+                        Retailer
+                      </th>
+                      <th className="px-8 border-b border-white/10 text-primary">
+                        Revenue
+                      </th>
+                      <th className="px-8 border-b border-white/10 text-emerald-400">
+                        Profit
+                      </th>
+                      <th className="px-8 border-b border-white/10 text-center">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 leading-none">
+                    {batch?.transactions
+                      ?.slice(0, 15)
+                      .map((t: any, i: number) => (
+                        <tr
+                          key={i}
+                          className="hover:bg-primary/[0.04] h-14 whitespace-nowrap leading-none uppercase group"
+                        >
+                          <td className="px-8 text-slate-500">
+                            {new Date(t.invoice_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-8 font-black text-white">
+                            {t.retailer?.retailer_name || "N/A"}
+                          </td>
+                          <td className="px-8 font-mono font-black text-primary italic">
+                            Rp {Number(t.total_sales).toLocaleString()}
+                          </td>
+                          <td className="px-8 font-mono text-emerald-500 italic">
+                            Rp {Number(t.operating_profit).toLocaleString()}
+                          </td>
+                          <td className="px-8 text-[8px] font-black text-primary text-center tracking-tighter">
+                            {t.record_status}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </Card>
+          </div>
+
+          {/* RIGHT: NEURAL THREAD & ACTIONS */}
+          <div className="xl:col-span-4 space-y-8 leading-none">
+            <div className="bg-gradient-to-b from-white/[0.08] to-transparent border border-white/10 rounded-[3.5rem] p-10 shadow-2xl backdrop-blur-md flex flex-col gap-10 leading-none">
+              <div className="flex items-center gap-4 text-primary font-black uppercase text-[11px] tracking-widest italic border-b border-white/5 pb-8 leading-none">
+                <MessageSquare size={18} /> Neural_Review_Thread
+              </div>
+
+              <div className="flex flex-col gap-12 leading-none text-left">
+                {/* Staff Remark */}
+                <div className="flex flex-col gap-4 leading-none">
+                  <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none italic">
+                    <User size={12} className="text-primary" />{" "}
+                    Staff_Transmission
+                  </div>
+                  <div className="bg-white/5 p-8 rounded-[2.5rem] rounded-tl-none border border-white/5 shadow-inner">
+                    <p className="text-[14px] text-slate-300 italic font-medium leading-relaxed break-words whitespace-pre-wrap">
+                      "{batch?.staff_comment || "No system remark provided."}"
+                    </p>
+                  </div>
+                </div>
+
+                {/* Admin Feedback Box */}
+                <div className="flex flex-col gap-4 leading-none pt-4 border-t border-white/5">
+                  <div className="flex items-center gap-3 text-[10px] font-black text-primary uppercase tracking-widest leading-none italic">
+                    <ShieldCheck size={14} /> Admin_Report_Center
+                  </div>
+                  <textarea
+                    value={adminReply}
+                    onChange={(e) => setAdminReply(e.target.value)}
+                    placeholder="Type final sync feedback..."
+                    className="w-full bg-black/40 border border-white/10 rounded-[2.5rem] p-8 text-[12px] font-bold min-h-[250px] outline-none focus:border-primary transition-all text-slate-200 italic resize-none leading-relaxed border-none uppercase tracking-tighter shadow-inner"
+                  />
+                </div>
+
+                {/* ACTION BUTTONS (UNDER COMMENT) */}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    disabled={processing}
+                    onClick={() => handleAction("REJECTED")}
+                    className="py-6 bg-rose-500/10 text-rose-500 rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-rose-500 hover:text-white transition-all border-none outline-none leading-none active:scale-95"
+                  >
+                    Reject_Nodes
+                  </button>
+                  <button
+                    disabled={processing}
+                    onClick={() => handleAction("APPROVED")}
+                    className="py-6 bg-primary text-black rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:scale-105 transition-all shadow-xl shadow-primary/20 border-none outline-none leading-none active:scale-95"
+                  >
+                    Approve_Sync
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* --- MODAL: FULLSCREEN DEEP AUDIT (13 COLUMNS) --- */}
+      {showFullAudit && (
+        <div className="fixed inset-0 z-[200] bg-[#020617]/98 backdrop-blur-3xl flex flex-col p-4 lg:p-10 animate-in fade-in zoom-in-95 duration-500 leading-none overflow-hidden">
+          <div className="flex justify-between items-center mb-10 bg-white/5 p-10 rounded-[3.5rem] border border-white/10 shadow-2xl leading-none">
+            <div className="space-y-3 leading-none text-left">
+              <h2 className="text-4xl lg:text-6xl font-black italic text-white uppercase tracking-tighter leading-none">
+                Deep_<span className="text-primary">Audit</span>
+              </h2>
+              <p className="text-[11px] font-black text-slate-500 uppercase tracking-[0.6em] mt-3 italic flex items-center gap-3 leading-none">
+                <Radio size={12} className="text-primary animate-pulse" />{" "}
+                FULL_MANIFEST_EXPOSURE: {batch?.transactions?.length} NODES
+              </p>
+            </div>
+            <button
+              onClick={() => setShowFullAudit(false)}
+              className="p-8 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-rose-500 hover:text-white transition-all outline-none border-none active:scale-90"
+            >
+              <X size={32} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-auto custom-scrollbar border border-white/10 rounded-[3.5rem] bg-black/40 leading-none">
+            <table className="w-full text-[10px] text-left border-separate border-spacing-0 min-w-[2800px] leading-none uppercase font-bold">
+              <thead className="sticky top-0 z-50">
+                <tr className="bg-[#0c1222] text-slate-500 h-20 border-b border-white/10 tracking-widest italic leading-none">
+                  <th className="px-8 sticky left-0 bg-[#0c1222] border-r border-white/20 text-primary text-center">
+                    Retailer
+                  </th>
+                  <th className="px-8 text-center">Inv_Date</th>
+                  <th className="px-8 text-center">Product</th>
+                  <th className="px-8 text-center">Price</th>
+                  <th className="px-8 text-center">Units</th>
+                  <th className="px-8 text-center text-primary">Sales</th>
+                  <th className="px-8 text-center text-emerald-400">Profit</th>
+                  <th className="px-8 text-center">Margin</th>
+                  <th className="px-8 text-center italic">Method</th>
+                  <th className="px-8 text-center">City</th>
+                  <th className="px-8 text-center">State</th>
+                  <th className="px-8 text-center text-primary italic">
+                    Region
+                  </th>
+                  <th className="px-8 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batch?.transactions?.map((t: any, i: number) => (
+                  <tr
+                    key={i}
+                    className="h-16 hover:bg-primary/[0.08] transition-all whitespace-nowrap text-center leading-none group"
+                  >
+                    <td className="px-8 text-left font-black text-white sticky left-0 bg-[#0c1222]/95 backdrop-blur-md border-r border-white/20 shadow-2xl">
+                      {t.retailer?.retailer_name || "N/A"}
+                    </td>
+                    <td className="px-8 text-slate-400 font-mono italic">
+                      {new Date(t.invoice_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-8 text-slate-200">
+                      {t.product?.product || "N/A"}
+                    </td>
+                    <td className="px-8 font-mono">
+                      Rp {formatIDR(t.price_per_unit)}
+                    </td>
+                    <td className="px-8 text-white">{t.unit_sold}</td>
+                    <td className="px-8 font-black text-primary italic">
+                      Rp {formatIDR(t.total_sales)}
+                    </td>
+                    <td className="px-8 font-black text-emerald-400">
+                      Rp {formatIDR(t.operating_profit)}
+                    </td>
+                    <td className="px-8 text-slate-500">
+                      {(Number(t.operating_margin) * 100).toFixed(0)}%
+                    </td>
+                    <td className="px-8 text-slate-600 font-black italic text-[9px]">
+                      {t.method?.method || "N/A"}
+                    </td>
+                    <td className="px-8 text-slate-500">
+                      {t.city?.city || "N/A"}
+                    </td>
+                    <td className="px-8 text-slate-600">
+                      {t.city?.state?.state || "N/A"}
+                    </td>
+                    <td className="px-8 text-primary font-black italic">
+                      {t.city?.state?.region || "N/A"}
+                    </td>
+                    <td className="px-8 text-primary font-black italic text-[8px] uppercase">
+                      {t.record_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

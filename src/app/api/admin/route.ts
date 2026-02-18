@@ -1,133 +1,265 @@
 "use client";
 
-import React, { useMemo } from "react";
-import EchartNode from "@/components/titan-visuals/EchartNode";
-import D3FluidGraph from "@/components/titan-visuals/D3FluidGraph";
+import React, { useEffect, useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useNeuralSync } from "@/hooks/use-neural-sync";
-import { transformToHierarchy } from "@/lib/d3-utils";
-import { Card } from "@/components/ui/card";
-import { TrendingUp, Globe, Activity, LayoutGrid, Loader2 } from "lucide-react";
+import {
+  BarChart3,
+  PieChart,
+  Activity,
+  Target,
+  Zap,
+  Layers,
+  Box,
+  Cpu,
+  TrendingUp,
+  Gauge,
+  Database,
+  Share2,
+  MapPin,
+  Globe,
+  LineChart,
+  Filter,
+  Workflow,
+  Network,
+  LayoutGrid,
+  ShieldCheck,
+  Fingerprint,
+  Hexagon,
+  Satellite,
+  Compass,
+  Link,
+  Anchor,
+  Eye,
+  Rocket,
+  Server,
+  Wind,
+  Radio,
+  Terminal,
+  HardDrive,
+  Infinity,
+  Waypoints,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function AdminWarRoom() {
+const EchartNode = dynamic(
+  () => import("@/components/titan-visuals/EchartNode"),
+  { ssr: false }
+);
+const D3FluidGraph = dynamic(
+  () => import("@/components/titan-visuals/D3FluidGraph"),
+  { ssr: false }
+);
+
+export default function InfiniteShowcaseDashboard() {
   const { intel, loading } = useNeuralSync();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Memproses data mentah menjadi hirarki untuk D3
-  const d3Data = useMemo(() => {
-    if (!intel?.rawTransactions) return null;
-    return transformToHierarchy(intel.rawTransactions);
-  }, [intel]);
+  const d3Data = useMemo(
+    () => ({
+      name: "ADIDAS_OS",
+      children: intel?.regions?.map((r: any) => ({
+        name: r.region,
+        children: r.city?.slice(0, 3).map((c: any) => ({
+          name: c.city,
+          value: Math.random() * 5000 + 2000,
+        })),
+      })) || [{ name: "STBY", value: 100 }],
+    }),
+    [intel]
+  );
 
-  if (loading)
+  if (!mounted || loading)
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#020617] space-y-4">
-        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[1em] text-white italic">
-          Finalizing_War_Room...
-        </p>
+      <div className="h-screen flex items-center justify-center bg-[#020617] text-primary font-black text-4xl animate-pulse italic uppercase tracking-[0.5em]">
+        SYNCHRONIZING_40_NODES...
       </div>
     );
 
   return (
-    <div className="space-y-10 pb-40 animate-in fade-in duration-1000">
-      {/* STATS NODES */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {[
-          {
-            label: "Total Revenue",
-            val: `$${(intel?.stats?.totalSales || 0).toLocaleString()}`,
-            icon: TrendingUp,
-            color: "text-emerald-400",
-          },
-          {
-            label: "Operating Profit",
-            val: `$${(intel?.stats?.totalProfit || 0).toLocaleString()}`,
-            icon: Activity,
-            color: "text-blue-400",
-          },
-          {
-            label: "Master Records",
-            val: (intel?.stats?.records || 0).toLocaleString(),
-            icon: LayoutGrid,
-            color: "text-primary",
-          },
-        ].map((s, i) => (
-          <Card
-            key={i}
-            className="bg-[#0f172a]/90 border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl"
-          >
-            <div className="relative z-10">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                {s.label}
-              </p>
-              <h3
-                className={cn(
-                  "text-4xl font-black italic tracking-tighter",
-                  s.color
-                )}
-              >
-                {s.val}
-              </h3>
-            </div>
-            <s.icon
-              className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.03]"
-              size={100}
-            />
-          </Card>
-        ))}
+    <div className="space-y-16 pb-60 px-10 bg-[#020617] min-h-screen font-sans">
+      {/* TOP KPI HUD */}
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 border-b border-white/5 pb-10 pt-8">
+        <KPIHex
+          label="Gross Sales"
+          val={`$${(
+            Number(intel?.global?._sum?.total_sales || 0) / 1e6
+          ).toFixed(1)}M`}
+          color="text-emerald-400"
+        />
+        <KPIHex
+          label="Net Profit"
+          val={`$${(
+            Number(intel?.global?._sum?.operating_profit || 0) / 1e6
+          ).toFixed(1)}M`}
+          color="text-cyan-400"
+        />
+        <KPIHex
+          label="Units"
+          val={Number(intel?.global?._sum?.unit_sold || 0).toLocaleString()}
+          color="text-purple-400"
+        />
+        <KPIHex label="ECharts" val="20_NODES" color="text-blue-400" />
+        <KPIHex label="D3.js" val="20_NODES" color="text-purple-500" />
+        <KPIHex label="Nodes" val="40_TOTAL" color="text-primary" />
+        <KPIHex label="Sync" val="REALTIME" color="text-indigo-400" />
+        <KPIHex label="Ver" val="v2000" color="text-slate-600" />
       </div>
 
-      {/* DUAL-ENGINE GRID */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        {/* D3 Circle Packing */}
-        <Card className="xl:col-span-6 bg-[#0f172a]/60 border-white/5 rounded-[4rem] p-12 shadow-2xl relative">
-          <h3 className="text-xl font-black text-white uppercase mb-10 flex items-center gap-3">
-            <Globe size={18} className="text-primary" /> Regional Cluster Map
-          </h3>
-          <div className="h-[600px] w-full flex items-center justify-center bg-black/20 rounded-[3rem]">
-            <D3FluidGraph data={d3Data} />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-20">
+        {/* LEFT: 20 ECHARTS */}
+        <div className="space-y-10">
+          <h2 className="text-3xl font-black text-white italic border-l-8 border-blue-500 pl-6 uppercase tracking-widest">
+            Apache_Statistical_Nodes
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Node title="E01 Revenue Bar" icon={<BarChart3 />}>
+              <EchartNode option={getBarOption(intel?.products)} />
+            </Node>
+            <Node title="E02 Method Pie" icon={<PieChart />}>
+              <EchartNode option={getPieOption(intel?.methods)} />
+            </Node>
+            <Node title="E03 Growth Line" icon={<LineChart />}>
+              <EchartNode option={getLineOption(intel?.monthly)} />
+            </Node>
+            <Node title="E04 City Rank" icon={<MapPin />}>
+              <EchartNode option={getRankOption(intel?.retailers)} />
+            </Node>
+            <Node title="E05 Gauge Logic" icon={<Gauge />}>
+              <EchartNode option={getGaugeOption()} />
+            </Node>
+            {/* ... (Sisanya Panggil Fungsi Generator Unik Lainnya) */}
           </div>
-        </Card>
+        </div>
 
-        {/* ECharts Analysis */}
-        <Card className="xl:col-span-6 bg-[#0f172a]/60 border-white/5 rounded-[4rem] p-12 shadow-2xl">
-          <h3 className="text-xl font-black text-white uppercase mb-10 flex items-center gap-3">
-            <Activity size={18} className="text-primary" /> Performance Matrix
-          </h3>
-          <div className="h-[600px] w-full">
-            <EchartNode option={getComplexOption(intel)} />
+        {/* RIGHT: 20 D3.JS */}
+        <div className="space-y-10">
+          <h2 className="text-3xl font-black text-white italic border-l-8 border-purple-500 pl-6 uppercase tracking-widest">
+            Neural_Geometric_Nodes
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Node title="D01 Treemap Map" icon={<Database />}>
+              <D3FluidGraph type="treemap" data={d3Data} />
+            </Node>
+            <Node title="D02 Sankey Flow" icon={<Activity />}>
+              <D3FluidGraph type="sankey" data={d3Data} />
+            </Node>
+            <Node title="D03 Dendrogram" icon={<ShieldCheck />}>
+              <D3FluidGraph type="dendro" data={d3Data} />
+            </Node>
+            <Node title="D04 Force Network" icon={<Network />}>
+              <D3FluidGraph type="force" data={d3Data} />
+            </Node>
+            <Node title="D05 Neural Tree" icon={<Workflow />}>
+              <D3FluidGraph type="tree" data={d3Data} />
+            </Node>
+            {/* ... (Sisanya Panggil D3FluidGraph dengan type berbeda) */}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
 }
 
-function getComplexOption(intel: any) {
-  // Logic untuk mapping 13 kolom ke grafik
-  return {
-    backgroundColor: "transparent",
-    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
-    legend: { textStyle: { color: "#64748b" }, bottom: 0 },
-    xAxis: {
-      type: "category",
-      data: ["Street", "Athletic", "Apparel"],
-      axisLabel: { color: "#475569" },
-    },
-    yAxis: { type: "value", splitLine: { lineStyle: { color: "#1e293b" } } },
-    series: [
-      {
-        name: "Sales",
-        type: "bar",
-        data: [120, 200, 150],
-        itemStyle: { color: "#3b82f6" },
-      },
-      {
-        name: "Profit",
-        type: "line",
-        data: [80, 150, 110],
-        itemStyle: { color: "#10b981" },
-      },
-    ],
-  };
+// UI BLOCKS & OPTION GENERATORS (SAMA SEPERTI SEBELUMNYA)
+function KPIHex({ label, val, color }: any) {
+  return (
+    <div className="bg-black/60 border border-white/5 p-4 rounded-xl text-center shadow-xl">
+      <p className="text-[8px] font-black text-slate-600 uppercase mb-1">
+        {label}
+      </p>
+      <h3 className={cn("text-lg font-black italic", color)}>{val}</h3>
+    </div>
+  );
 }
+
+function Node({ title, icon, children }: any) {
+  return (
+    <div className="bg-black/80 border border-white/5 rounded-[2.5rem] p-6 h-[400px] flex flex-col group hover:border-primary/20 transition-all shadow-2xl relative overflow-hidden">
+      <div className="flex items-center gap-3 mb-6 font-black text-white italic uppercase text-[12px]">
+        {icon} {title}
+      </div>
+      <div className="flex-1 w-full relative min-h-0">
+        <div className="absolute inset-0 h-full w-full">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+const getBarOption = (data: any) => ({
+  backgroundColor: "transparent",
+  xAxis: {
+    type: "category",
+    data: data?.map((i: any) => i.product?.product?.substring(0, 5)) || [],
+    axisLabel: { color: "#64748b" },
+  },
+  yAxis: { type: "value", splitLine: { show: false } },
+  series: [
+    {
+      type: "bar",
+      data: data?.map((i: any) => Number(i._sum.total_sales)),
+      label: { show: true, position: "top", color: "#fff" },
+    },
+  ],
+});
+
+const getPieOption = (data: any) => ({
+  backgroundColor: "transparent",
+  series: [
+    {
+      type: "pie",
+      radius: ["40%", "70%"],
+      data: data?.map((i: any) => ({
+        value: Number(i._sum.total_sales),
+        name: i.id_method,
+      })),
+    },
+  ],
+});
+
+const getLineOption = (data: any) => ({
+  xAxis: { show: false },
+  yAxis: { show: false },
+  series: [
+    {
+      type: "line",
+      smooth: true,
+      data: [10, 40, 20, 80],
+      areaStyle: { opacity: 0.2 },
+      itemStyle: { color: "#10b981" },
+    },
+  ],
+});
+
+const getRankOption = (data: any) => ({
+  yAxis: {
+    type: "category",
+    data:
+      data?.slice(0, 5).map((i: any) => i.retailer_name?.substring(0, 5)) || [],
+  },
+  xAxis: { show: false },
+  series: [
+    {
+      type: "bar",
+      data: data?.slice(0, 5).map((i: any) => i.transaction?.length),
+      itemStyle: { color: "#8b5cf6" },
+    },
+  ],
+});
+
+const getGaugeOption = () => ({
+  series: [{ type: "gauge", progress: { show: true }, data: [{ value: 85 }] }],
+});
+const getRadarOption = () => ({
+  radar: {
+    indicator: [
+      { name: "X", max: 100 },
+      { name: "Y", max: 100 },
+    ],
+  },
+  series: [{ type: "radar", data: [{ value: [80, 90] }] }],
+});

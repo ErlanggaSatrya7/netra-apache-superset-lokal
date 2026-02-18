@@ -1,25 +1,44 @@
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
 export async function GET(
-  req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const resolvedParams = await params;
+    const batchId = Number(resolvedParams.id);
 
-    const details = await prisma.transaction.findMany({
-      where: { id_upload: Number(id) },
+    if (isNaN(batchId))
+      return NextResponse.json({ error: "INVALID_ID" }, { status: 400 });
+
+    const batch = await prisma.upload_history.findUnique({
+      where: { id_upload: batchId },
       include: {
-        retailer: true,
-        product: true,
-        city: true,
+        transactions: {
+          include: {
+            retailer: true,
+            product: true,
+            method: true,
+            city: {
+              include: { state: true },
+            },
+          },
+          orderBy: { id_transaction: "asc" },
+        },
       },
-      orderBy: { invoice_date: "asc" },
     });
 
-    return NextResponse.json(details);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!batch)
+      return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+
+    // Pastikan mengembalikan data utuh agar JSON tidak "Unexpected End"
+    return NextResponse.json(batch);
+  } catch (error) {
+    console.error("API_DETAIL_ERROR:", error);
+    return NextResponse.json(
+      { error: "INTERNAL_SERVER_ERROR" },
+      { status: 500 }
+    );
   }
 }

@@ -1,109 +1,95 @@
 "use client";
 
-import React from "react";
-import EchartNode from "@/components/titan-visuals/EchartNode";
-import D3FluidGraph from "@/components/titan-visuals/D3FluidGraph";
-import { Card } from "@/components/ui/card";
-import { Activity, Zap, Layers, Network, Loader2 } from "lucide-react";
-import { useNeuralSync } from "@/hooks/use-neural-sync";
-import { cn } from "@/lib/utils"; // FIX: cn IMPORTED
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { History, Database, Search, Clock, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 
-export default function StaffPerformanceNode() {
-  const { intel, loading } = useNeuralSync();
+export default function StaffHistoryList() {
+  const router = useRouter();
+  const [history, setHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/admin/approval");
+        if (!res.ok) throw new Error("FETCH_FAILED");
+        const data = await res.json();
+        setHistory(Array.isArray(data) ? data : []);
+      } catch (err) {
+        toast.error("SYNC_FAILED");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   if (loading)
     return (
-      <div className="h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        <p className="text-[10px] font-black uppercase tracking-[1em] text-slate-500">
-          Establishing_Neural_Sync...
-        </p>
+      <div className="h-screen bg-[#020617] flex items-center justify-center text-primary italic font-black">
+        ACCESSING_VAULT...
       </div>
     );
 
   return (
-    <div className="space-y-12 pb-40 animate-in fade-in duration-1000">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {[
-          {
-            label: "My Uplinks",
-            val: intel?.allHistory?.length || 0,
-            color: "text-primary",
-            icon: Activity,
-          },
-          {
-            label: "Nodes Transmitted",
-            val: intel?.stats?.records || 0,
-            color: "text-emerald-400",
-            icon: Layers,
-          },
-          {
-            label: "Node State",
-            val: "ACTIVE",
-            color: "text-amber-400",
-            icon: Zap,
-          },
-        ].map((k, i) => (
-          <Card
-            key={i}
-            className="bg-[#0f172a]/90 border-white/5 rounded-[2.5rem] p-10 h-44 flex items-center relative overflow-hidden shadow-2xl"
-          >
-            <div className="relative z-10 min-w-0">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.4em] mb-2">
-                {k.label}
-              </p>
-              <h3
-                className={cn(
-                  "text-4xl font-black italic tracking-tighter truncate",
-                  k.color
-                )}
-              >
-                {k.val}
-              </h3>
-            </div>
-            <k.icon
-              className="absolute right-6 top-1/2 -translate-y-1/2 opacity-[0.03] text-white"
-              size={100}
-            />
-          </Card>
-        ))}
-      </div>
+    <div className="min-h-screen bg-[#020617] text-slate-300 p-10 pt-24 leading-none italic">
+      <div className="max-w-[1400px] mx-auto space-y-12">
+        <h1 className="text-7xl font-black text-white uppercase tracking-tighter">
+          History_<span className="text-primary">Logs</span>
+        </h1>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-10 h-[700px]">
-        <Card className="xl:col-span-5 bg-[#0f172a]/60 backdrop-blur-3xl border-white/5 rounded-[4rem] p-16 shadow-2xl flex flex-col items-center justify-center">
-          <h3 className="text-2xl font-black italic uppercase text-white mb-10">
-            Entity Density
-          </h3>
-          <D3FluidGraph data={intel?.hierarchy} />
-        </Card>
-        <Card className="xl:col-span-7 bg-[#0f172a]/60 backdrop-blur-3xl border-white/5 rounded-[4rem] p-16 shadow-2xl">
-          <h3 className="text-2xl font-black italic uppercase text-white mb-10">
-            Regional Performance
-          </h3>
-          <EchartNode option={getStaffOption(intel)} />
-        </Card>
+        <div className="bg-white/5 border border-white/10 rounded-[3rem] overflow-hidden">
+          <table className="w-full text-left text-[11px] font-black uppercase tracking-widest leading-none">
+            <thead className="bg-white/5 h-16 text-slate-500">
+              <tr>
+                <th className="px-10">TX_ID</th>
+                <th className="px-10">Manifest</th>
+                <th className="px-10 text-center">Nodes</th>
+                <th className="px-10 text-center">Status</th>
+                <th className="px-10 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h, i) => (
+                <tr
+                  key={i}
+                  // --- FIX NAVIGASI DI SINI ---
+                  onClick={() => router.push(`/staff/history/${h.id_upload}`)}
+                  className="h-24 border-b border-white/5 hover:bg-primary/[0.05] cursor-pointer transition-all group"
+                >
+                  <td className="px-10 text-primary font-mono italic">
+                    #TX-{h.id_upload}
+                  </td>
+                  <td className="px-10 text-white text-base">{h.file_name}</td>
+                  <td className="px-10 text-center font-mono text-slate-500">
+                    {h.total_rows}
+                  </td>
+                  <td className="px-10 text-center">
+                    <span
+                      className={`px-4 py-2 rounded-full border text-[9px] ${
+                        h.status === "APPROVED"
+                          ? "border-emerald-500 text-emerald-500 bg-emerald-500/10"
+                          : h.status === "REJECTED"
+                          ? "border-rose-500 text-rose-500 bg-rose-500/10"
+                          : "border-amber-500 text-amber-500"
+                      }`}
+                    >
+                      {h.status}
+                    </span>
+                  </td>
+                  <td className="px-10 text-right">
+                    <div className="p-3 bg-white/5 rounded-full inline-block group-hover:bg-primary group-hover:text-black transition-all">
+                      <ChevronRight size={20} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
-}
-
-function getStaffOption(intel: any) {
-  const cities = intel?.citySales?.map((c: any) => c.name) || [];
-  const vals = intel?.citySales?.map((c: any) => c.total) || [];
-  return {
-    backgroundColor: "transparent",
-    xAxis: {
-      type: "category",
-      data: cities,
-      axisLabel: { color: "#475569", fontSize: 10, rotate: 45 },
-    },
-    yAxis: { type: "value", splitLine: { lineStyle: { color: "#1e293b" } } },
-    series: [
-      {
-        data: vals,
-        type: "bar",
-        itemStyle: { color: "#3b82f6", borderRadius: [4, 4, 0, 0] },
-      },
-    ],
-  };
 }

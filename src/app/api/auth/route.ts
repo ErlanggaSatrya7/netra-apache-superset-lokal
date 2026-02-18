@@ -1,50 +1,52 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, email, password } = body;
-    const cookieStore = await cookies();
 
-    // LOGOUT
-    if (action === "logout") {
-      cookieStore.set("vortex_session", "", {
-        expires: new Date(0),
-        path: "/",
-      });
-      cookieStore.set("user_role", "", { expires: new Date(0), path: "/" });
-      return NextResponse.json({ success: true });
+    // Handle Logout Action
+    if (body.action === "logout") {
+      const response = NextResponse.json({ success: true });
+      response.cookies.delete("user_role");
+      response.cookies.delete("user_email");
+      return response;
     }
 
-    // LOGIN
-    // Gunakan email.trim().toLowerCase() agar tidak typo karena huruf besar
-    const user = await prisma.users.findUnique({
-      where: { email: email.trim().toLowerCase() },
-    });
+    const { email, password } = body;
+    const user = await prisma.users.findUnique({ where: { email } });
 
     if (!user || user.password !== password) {
       return NextResponse.json(
-        { error: "CREDENTIAL_MISMATCH" },
+        { error: "CREDENTIALS_INVALID" },
         { status: 401 }
       );
     }
 
-    const rolePath = user.role?.toUpperCase() === "ADMIN" ? "/admin" : "/staff";
+    // Tentukan target halaman
+    const targetPath = user.role === "ADMIN" ? "/admin" : "/staff";
 
-    // Set Cookies
-    cookieStore.set("vortex_session", "active", { path: "/" });
-    cookieStore.set("user_role", user.role?.toLowerCase() || "staff", {
-      path: "/",
-    });
-
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
-      redirect: rolePath,
+      role: user.role,
+      redirect: targetPath, // Kirim ini ke frontend
     });
-  } catch (error: any) {
-    console.error("AUTH_ERROR:", error);
-    return NextResponse.json({ error: "DATABASE_TIMEOUT" }, { status: 500 });
+
+    // Pasang Cookie biar Middleware ngenalin
+    response.cookies.set("user_role", user.role || "STAFF", {
+      path: "/",
+      httpOnly: false,
+    });
+    response.cookies.set("user_email", user.email || "", {
+      path: "/",
+      httpOnly: false,
+    });
+
+    return response;
+  } catch (error) {
+    return NextResponse.json(
+      { error: "DATABASE_CONNECTION_FAIL" },
+      { status: 500 }
+    );
   }
 }

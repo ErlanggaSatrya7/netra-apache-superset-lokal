@@ -1,115 +1,109 @@
 "use client";
 
-import React, { useState } from "react";
-import { usePathname } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  LogOut,
-  Cpu,
-  Loader2,
   LayoutDashboard,
-  Shield,
   Database,
-  Settings,
-  BarChart3,
+  ShieldCheck,
   FileUp,
   History,
+  LogOut,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 export default function Sidebar({ isOpen }: { isOpen: boolean }) {
   const pathname = usePathname();
-  const [isExiting, setIsExiting] = useState(false);
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
-  const handleLogout = async () => {
-    setIsExiting(true);
-    const loader = toast.loading("Terminating Session...");
-    try {
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        body: JSON.stringify({ action: "logout" }),
-      });
+  useEffect(() => {
+    // Ambil role hanya di Client side
+    const userRole = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("user_role="))
+      ?.split("=")[1];
+    setRole(userRole || "STAFF");
+    setMounted(true);
+  }, []);
 
-      if (res.ok) {
-        toast.success("Identity_Cleared", { id: loader });
-        // FORCE RELOAD ke login untuk memastikan cache browser bersih
-        window.location.href = "/login";
-      }
-    } catch (e) {
-      toast.error("EXIT_LINK_FAILURE", { id: loader });
-    } finally {
-      setIsExiting(false);
-    }
+  // Cegah render apapun sebelum mounted untuk menghindari Hydration Error
+  if (!mounted) return <div className="w-[300px] bg-[#0f172a]" />;
+
+  const menu =
+    role === "ADMIN"
+      ? [
+          { name: "War Room", path: "/admin", icon: LayoutDashboard },
+          { name: "Inbound Audit", path: "/admin/approval", icon: ShieldCheck },
+          { name: "Central Vault", path: "/admin/warehouse", icon: Database },
+        ]
+      : [
+          { name: "Analytics", path: "/staff", icon: LayoutDashboard },
+          { name: "Ingestion", path: "/staff/upload", icon: FileUp },
+          { name: "History", path: "/staff/history", icon: History },
+        ];
+
+  const handleLogout = () => {
+    document.cookie = "user_role=; Max-Age=0; path=/;";
+    document.cookie = "user_email=; Max-Age=0; path=/;";
+    window.location.href = "/login";
   };
 
-  const isAdmin = pathname.includes("/admin");
-  const links = isAdmin
-    ? [
-        { label: "War Room", path: "/admin", icon: LayoutDashboard },
-        { label: "Audit", path: "/admin/approval", icon: Shield },
-        { label: "Vault", path: "/admin/warehouse", icon: Database },
-        { label: "Config", path: "/admin/settings", icon: Settings },
-      ]
-    : [
-        { label: "Stats", path: "/staff", icon: BarChart3 },
-        { label: "Ingest", path: "/staff/upload", icon: FileUp },
-        { label: "Feed", path: "/staff/history", icon: History },
-        { label: "Profile", path: "/staff/settings", icon: Settings },
-      ];
-
   return (
-    <div className="flex flex-col h-full py-8">
-      <div className="px-6 mb-12 flex items-center gap-4 shrink-0">
-        <div className="min-w-[45px] h-[45px] rounded-xl bg-primary flex items-center justify-center shadow-lg">
-          <Cpu size={24} className="text-white" />
-        </div>
+    <div className="h-full flex flex-col p-6 animate-in fade-in duration-500">
+      <div className="flex items-center gap-3 px-4 mb-12">
+        <Zap className="text-primary fill-primary" size={28} />
         {isOpen && (
-          <h1 className="text-xl font-black italic text-white truncate uppercase tracking-tighter">
-            Netra Titan
-          </h1>
+          <span className="text-xl font-black italic tracking-tighter text-white uppercase">
+            Vortex
+            <span className="text-primary font-sans lowercase">.netra</span>
+          </span>
         )}
       </div>
 
-      <nav className="flex-1 px-3 space-y-2 overflow-y-auto scrollbar-none">
-        {links.map((link) => (
-          <button
-            key={link.path}
-            onClick={() => (window.location.href = link.path)}
-            className={cn(
-              "w-full flex items-center gap-4 p-4 rounded-2xl transition-all group",
-              pathname === link.path
-                ? "bg-primary/10 text-primary shadow-inner border border-primary/20"
-                : "hover:bg-white/5 text-slate-500"
-            )}
-          >
-            <link.icon size={isOpen ? 20 : 24} />
-            {isOpen && (
-              <span className="text-[11px] font-black uppercase italic tracking-widest truncate">
-                {link.label}
-              </span>
-            )}
-          </button>
-        ))}
+      <nav className="flex-1 space-y-2">
+        {menu.map((item) => {
+          const isActive = pathname === item.path;
+          return (
+            <button
+              key={item.path}
+              onClick={() => router.push(item.path)}
+              className={cn(
+                "w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all group",
+                isActive
+                  ? "bg-primary text-black font-black shadow-lg shadow-primary/20"
+                  : "text-slate-500 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <item.icon
+                size={20}
+                className={cn(
+                  isActive ? "text-black" : "group-hover:text-primary"
+                )}
+              />
+              {isOpen && (
+                <span className="text-[10px] uppercase tracking-[0.2em] font-black">
+                  {item.name}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="px-3 mt-8 pt-8 border-t border-white/5 shrink-0">
-        <button
-          onClick={handleLogout}
-          disabled={isExiting}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl text-rose-500 hover:bg-rose-600 hover:text-white transition-all shadow-lg"
-        >
-          {isExiting ? (
-            <Loader2 size={20} className="animate-spin" />
-          ) : (
-            <LogOut size={20} />
-          )}
-          {isOpen && (
-            <span className="text-[11px] font-black uppercase italic tracking-widest truncate ml-2">
-              Terminate
-            </span>
-          )}
-        </button>
-      </div>
+      <button
+        onClick={handleLogout}
+        className="flex items-center gap-4 px-4 py-4 text-rose-500 hover:bg-rose-500/10 rounded-2xl transition-all mt-auto border border-transparent hover:border-rose-500/20"
+      >
+        <LogOut size={20} />
+        {isOpen && (
+          <span className="text-[10px] uppercase tracking-[0.2em] font-black italic">
+            Terminate_Session
+          </span>
+        )}
+      </button>
     </div>
   );
 }

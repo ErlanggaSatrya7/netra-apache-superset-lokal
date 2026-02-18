@@ -1,87 +1,110 @@
 import { prisma } from "@/lib/prisma";
-import { vortexCleaningEngine } from "@/lib/cleaning-pipeline";
 import { NextResponse } from "next/server";
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const { fileName, rawData, userEmail, staffComment } = await req.json();
-
-    // PHASE 1: NEURAL CLEANING (PYTHON SPEED)
-    // vortexCleaningEngine (lib/cleaning-pipeline.ts) memproses ribuan data di RAM bukan di I/O DB.
-    const cleanNodes = vortexCleaningEngine(rawData);
-
-    // PHASE 2: MASSIVE BATCH HANDSHAKE
-    const result = await prisma.$transaction(
-      async (tx) => {
-        // 1. Create Header with Traceability
-        const history = await tx.upload_history.create({
-          data: {
-            file_name: fileName,
-            system_name: `ADI-TITAN-${Date.now()}`,
-            status: "PENDING",
-            total_rows: cleanNodes.length,
-            uploaded_by: userEmail,
-            note: staffComment || "Auto-sanitized batch.",
+    const [
+      global,
+      p_sales,
+      p_profit,
+      p_units,
+      m_share,
+      r_share,
+      city_perf,
+      region_perf,
+      monthly,
+      recent,
+      history,
+      retailers,
+    ] = await prisma.$transaction([
+      prisma.transaction.aggregate({
+        where: { is_approved: true },
+        _sum: { total_sales: true, operating_profit: true, unit_sold: true },
+        _avg: { operating_margin: true },
+        _count: { id_transaction: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["id_product"],
+        where: { is_approved: true },
+        _sum: { total_sales: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["id_product"],
+        where: { is_approved: true },
+        _sum: { operating_profit: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["id_product"],
+        where: { is_approved: true },
+        _sum: { unit_sold: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["id_method"],
+        where: { is_approved: true },
+        _sum: { total_sales: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ["id_retailer"],
+        where: { is_approved: true },
+        _sum: { total_sales: true },
+      }),
+      prisma.city.findMany({
+        include: {
+          transaction: {
+            where: { is_approved: true },
+            select: { total_sales: true },
           },
-        });
-
-        // 2. High-Speed Relational Upsert
-        for (const node of cleanNodes) {
-          const stateNode = await tx.state.upsert({
-            where: { state: node.state },
-            update: {},
-            create: { state: node.state, region: node.region },
-          });
-
-          const cityNode = await tx.city.upsert({
-            where: { city: node.city },
-            update: { id_state: stateNode.id_state },
-            create: { city: node.city, id_state: stateNode.id_state },
-          });
-
-          // Final Transaction Insertion
-          await tx.transaction.create({
-            data: {
-              id_upload: history.id_upload,
-              id_retailer: (
-                await tx.retailer.upsert({
-                  where: { retailer_name: node.retailer },
-                  update: {},
-                  create: { retailer_name: node.retailer },
-                })
-              ).id_retailer,
-              id_product: (
-                await tx.product.upsert({
-                  where: { product: node.product },
-                  update: {},
-                  create: { product: node.product },
-                })
-              ).id_product,
-              id_method: (
-                await tx.method.upsert({
-                  where: { method: node.salesMethod },
-                  update: {},
-                  create: { method: node.salesMethod },
-                })
-              ).id_method,
-              id_city: cityNode.id_city,
-              unit_sold: node.unitsSold,
-              total_sales: node.totalSales,
-              operating_profit: node.operatingProfit,
-              operating_margin: node.operatingMargin,
-              price_per_unit: node.pricePerUnit,
-              invoice_date: node.invoiceDate,
-              is_approved: false,
+        },
+      }),
+      prisma.state.findMany({
+        include: {
+          city: {
+            include: {
+              transaction: {
+                where: { is_approved: true },
+                select: { total_sales: true },
+              },
             },
-          });
-        }
-        return history;
-      },
-      { timeout: 600000 }
-    );
+          },
+        },
+      }),
+      prisma.transaction.groupBy({
+        by: ["invoice_date"],
+        where: { is_approved: true },
+        _sum: { total_sales: true },
+      }),
+      prisma.transaction.findMany({
+        where: { is_approved: true },
+        include: { retailer: true, product: true, city: true },
+        take: 30,
+        orderBy: { id_transaction: "desc" },
+      }),
+      prisma.upload_history.findMany({ orderBy: { upload_date: "desc" } }),
+      prisma.retailer.findMany({
+        include: {
+          transaction: {
+            where: { is_approved: true },
+            select: { total_sales: true, operating_profit: true },
+          },
+        },
+      }),
+    ]);
 
-    return NextResponse.json({ success: true, batchId: result.id_upload });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      global,
+      p_sales,
+      p_profit,
+      p_units,
+      m_share,
+      r_share,
+      city_perf,
+      region_perf,
+      monthly,
+      recent,
+      allHistory: history,
+      retailers,
+    });
+  } catch (e) {
+    return NextResponse.json({ error: "NEURAL_SYNC_FAILED" }, { status: 500 });
   }
 }

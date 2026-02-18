@@ -1,54 +1,37 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import * as echarts from "echarts";
-import { cn } from "@/lib/utils";
 
-interface EChartNodeProps {
-  option: any;
-  className?: string;
-  theme?: "dark" | "light";
-}
-
-/**
- * TITAN ECHARTS WRAPPER v31.0
- * Logic: Auto-Resize & Layout-Sync Handshake
- */
-export default function EchartNode({
-  option,
-  className,
-  theme = "dark",
-}: EChartNodeProps) {
+export default function EchartNode({ option }: { option: any }) {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
   useEffect(() => {
-    if (chartRef.current) {
-      // Initialize if not exists
-      if (!chartInstance.current) {
-        chartInstance.current = echarts.init(chartRef.current, theme);
-      }
-      chartInstance.current.setOption(option);
+    if (!chartRef.current) return;
+
+    if (!chartInstance.current) {
+      chartInstance.current = echarts.init(chartRef.current);
     }
 
-    // Zero-Spill Strategy: Resize chart when window or container change
-    const resizeObserver = new ResizeObserver(() => {
-      chartInstance.current?.resize();
-    });
+    // Hanya setOption jika data series dan xAxis valid
+    if (option && option.series && option.series.length > 0) {
+      try {
+        chartInstance.current.setOption(option, true); // true = force update
+      } catch (err) {
+        console.warn("ECharts_Pending_Data...");
+      }
+    }
 
-    if (chartRef.current) resizeObserver.observe(chartRef.current);
+    const handleResize = () => chartInstance.current?.resize();
+    window.addEventListener("resize", handleResize);
 
     return () => {
-      resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
       chartInstance.current?.dispose();
       chartInstance.current = null;
     };
-  }, [option, theme]);
+  }, [option]);
 
-  return (
-    <div
-      ref={chartRef}
-      className={cn("w-full h-full min-h-[350px] transition-all", className)}
-    />
-  );
+  return <div ref={chartRef} className="w-full h-full min-h-[300px]" />;
 }
